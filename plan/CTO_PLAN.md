@@ -294,4 +294,4 @@ Keep `INFOPLIST_FILE = WisperVoice/Info.plist` and flip plist key directly; `INF
 
 ---
 
-*Reviewed files: `WisperVoiceApp.swift`, `Info.plist`, `WisperVoice.entitlements`, `Managers/*` (AudioRecorder, DictationManager, OverlayWindow, HistoryStore, PermissionsManager, HotkeyManager, TextInjector, TranscriptionService, ModelManager), `Views/*` (MenuBarView, SettingsView), `project.pbxproj`, `README.md`, `ROADMAP.md`.*
+*Reviewed files: `WisperVoiceApp.swift`, `Info.plist`, `WisperVoice.entitlements`, `Managers/*` (AudioRecorder, DictationManager, OverlayWindow, HistoryStore, PermissionsManager, HotkeyManager, TextInjector, TranscriptionService, ModelManager), `Views/*` (MenuBarView, SettingsView), `project.pbxproj`, `../README.md`, `ROADMAP.md`.*

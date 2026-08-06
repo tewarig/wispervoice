@@ -84,7 +84,7 @@
 > As a user I see WisperVoice in the **Dock** so I can click to bring the app forward, access Settings/shortcuts, and quit — like a normal Mac app.
 
 ### Current state
-- `Info.plist` `LSUIElement = true` → `activationPolicy = .accessory` (no Dock, no Cmd+Tab, no Dock menu). This is intentional "no Dock clutter" per `PM_PLAN.md` principle, but directly conflicts with user expectation + blocks discoverability of Settings.
+- `Info.plist` `LSUIElement = true` → `activationPolicy = .accessory` (no Dock, no Cmd+Tab, no Dock menu). This is intentional "no Dock clutter" per `../plan/PM_PLAN.md` principle, but directly conflicts with user expectation + blocks discoverability of Settings.
 
 ### Decision (PM + CTO must approve one)
 
@@ -237,7 +237,7 @@
 
 ## 9. Open Questions for CTO (resolve before sprint)
 
-1. Dock default: PM recommends **default ON** — confirm with design? (PM_PLAN.md "No Dock clutter" principle conflicts; needs explicit override note.)
+1. Dock default: PM recommends **default ON** — confirm with design? (../plan/PM_PLAN.md "No Dock clutter" principle conflicts; needs explicit override note.)
 2. Silence threshold default: 5s — too long for chatty users? Consider 3s default with 5s max? PM says keep 5s to reduce false commits.
 3. Onboarding persistence key: `hasSeenOnboarding` vs existing `hasCompletedOnboarding` — check `UserDefaults` for collision.
 4. History search: v1 filter only, or also fuzzy? Spec says simple `localizedCaseInsensitiveContains`.

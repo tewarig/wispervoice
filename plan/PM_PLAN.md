@@ -234,7 +234,7 @@ All sprints: planning Mon, daily async standup, review + retro Fri week 2. Capac
   - [ ] Manual QA in TextEdit + one Electron app (Slack) + one native (Xcode)
   - [ ] Permissions path tested (Mic/Speech/Accessibility denied → banner)
   - [ ] No `UserDefaults` key collision (prefix `ai.*`, `feature.*`)
-  - [ ] Docs updated (`README.md` / `ROADMAP.md` checkbox) if user-visible
+  - [ ] Docs updated (`../README.md` / `ROADMAP.md` checkbox) if user-visible
   - [ ] No Xcode source formatting churn (only touched files)
 - **AI PR extra:** WER/latency note + model size / download time.
 - **Release PR:** Notarization log + Sparkle appcast diff attached.

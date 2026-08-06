@@ -64,7 +64,7 @@ Before opening a PR:
 - [ ] Tests pass locally (`xcodebuild test ...`)
 - [ ] New code has tests; existing tests still pass
 - [ ] `swiftlint` is clean (or justified warnings)
-- [ ] Updated `README.md` / `ROADMAP.md` if user-facing
+- [ ] Updated `README.md` / `plan/ROADMAP.md` if user-facing
 - [ ] No Xcode source modifications beyond scope (PR template will prompt)
 
 Use the [pull request template](.github/pull_request_template.md). Fill in all sections — it helps reviewers.

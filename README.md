@@ -27,7 +27,7 @@
   <a href="#architecture">Architecture</a> •
   <a href="#settings">Settings</a> •
   <a href="#development">Development</a> •
-  <a href="ROADMAP.md">Roadmap</a> •
+  <a href="plan/ROADMAP.md">Roadmap</a> •
   <a href="CONTRIBUTING.md">Contributing</a>
 </p>
 
@@ -179,7 +179,7 @@ WisperVoice.xcodeproj/              # Xcode project, shared scheme (TestAction c
 website/index.html                  # Landing page for GitHub Pages / Cloudflare Pages
 ```
 
-Detailed product roadmap: [`ROADMAP.md`](ROADMAP.md).
+Detailed product roadmap: [`ROADMAP.md`](plan/ROADMAP.md).
 
 ---
 
@@ -253,7 +253,7 @@ Security reports: **do not open a public issue** — see [`SECURITY.md`](SECURIT
 
 ## 🗺️ Roadmap
 
-See [`ROADMAP.md`](ROADMAP.md) for shipped (v1.0/v1.1), near-term (v1.2: streaming Whisper via WhisperKit, hold-to-talk, custom vocabulary, per-app formatting, Sparkle updates), and future (v1.3: iOS companion, notetaker, on-device LLM polish).
+See [`ROADMAP.md`](plan/ROADMAP.md) for shipped (v1.0/v1.1), near-term (v1.2: streaming Whisper via WhisperKit, hold-to-talk, custom vocabulary, per-app formatting, Sparkle updates), and future (v1.3: iOS companion, notetaker, on-device LLM polish).
 
 ---
 

@@ -1,2 +1,2 @@
-# CLAUDE — read AGENTS.md
-See AGENTS.md for shared memory. Also read ROADMAP.md and PM_PLAN.md.
+# CLAUDE — read agents/AGENTS.md
+See agents/AGENTS.md for shared memory. Also read plan/ROADMAP.md and plan/PM_PLAN.md.

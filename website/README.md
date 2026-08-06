@@ -10,13 +10,13 @@ Premium marketing site for **WisperVoice**, a native Mac dictation app (Wispr Fl
 
 ```bash
 cd website
-npm install        # or: npm --cache /tmp/npm-cache install
-npm run dev        # http://localhost:5173
-npm run build      # production build → dist/
-npm run preview    # preview build → http://localhost:4173
+pnpm install
+pnpm dev            # http://localhost:5173
+pnpm build          # production build → dist/
+pnpm preview        # preview build → http://localhost:4173
 ```
 
-> **Node note:** `create-vite@9` needs Node `^20.19`. This project pins Vite 5 so Node 20.0 works. If `npm install` hits `EPERM` on the global cache, use `npm --cache /tmp/npm-cache install`.
+> **Node note:** `create-vite@9` needs Node `^20.19`. This project pins Vite 5 so Node 20.0 works.
 
 ---
 
@@ -61,7 +61,7 @@ Colors and shadows are centralized in `tailwind.config.js` (`ink`, `violet`, `aq
   <video src="/demo.mp4" autoPlay muted loop playsInline className="w-full h-full object-cover rounded-[18px]" />
   ```
 - **Copy / pricing:** Edit constants at top of `src/App.jsx` (`FEATURES`, `TESTIMONIALS`, `FAQS`, `steps`).
-- **Deploy:** `dist/` is static — deploy to Cloudflare Pages, Vercel, or Netlify. For Cloudflare Pages: `Build command: npm run build`, `Output: dist`.
+- **Deploy:** `dist/` is static — deploy to Cloudflare Pages, Vercel, or Netlify. For Cloudflare Pages: `Build command: pnpm build`, `Output: dist`.
 
 ---
 

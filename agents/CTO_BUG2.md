@@ -2,7 +2,7 @@
 
 **Owner:** CTO / Architect · **Date:** 2026-08-06 · **App:** WisperVoice SwiftUI macOS 14+ (`WisperVoice/`, Xcode 16.3, Swift 5.9)
 **Constraint:** Do **not** modify `WisperVoice.xcodeproj/project.pbxproj` (no `INFOPLIST_KEY_LSUIElement` / target edits). Only `*.swift` + `WisperVoice/Info.plist` values. Sync target: `/tmp/cto_bug2.md` ↔ `CTO_BUG2.md` (identical).
-**Related:** `CTO_PLAN.md` (§1–§4), `PM_SPEC_FIXES.md` (#1, #3, #4), existing implementation in `WisperVoiceApp.swift:12-181`, `Managers/OverlayWindow.swift:1-231`, `Views/MenuBarView.swift:1-291`, `Info.plist:9`.
+**Related:** `../plan/CTO_PLAN.md` (§1–§4), `PM_SPEC_FIXES.md` (#1, #3, #4), existing implementation in `WisperVoiceApp.swift:12-181`, `Managers/OverlayWindow.swift:1-231`, `Views/MenuBarView.swift:1-291`, `Info.plist:9`.
 
 ---
 
