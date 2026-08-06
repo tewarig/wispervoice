@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Scheme LastUpgradeVersion = "1630" version = "1.7">
+   <BuildAction parallelizeBuildables = "YES" buildImplicitDependencies = "YES">
+      <BuildActionEntries>
+         <BuildActionEntry buildForTesting = "YES" buildForRunning = "YES" buildForProfiling = "YES" buildForArchiving = "YES" buildForAnalyzing = "YES">
+            <BuildableReference BuildableIdentifier = "primary" BlueprintIdentifier = "TARGET_APP" BuildableName = "WisperVoice.app" BlueprintName = "WisperVoice" ReferencedContainer = "container:WisperVoice.xcodeproj"></BuildableReference>
+         </BuildActionEntry>
+         <BuildActionEntry buildForTesting = "YES" buildForRunning = "NO" buildForProfiling = "NO" buildForArchiving = "NO" buildForAnalyzing = "NO">
+            <BuildableReference BuildableIdentifier = "primary" BlueprintIdentifier = "D190BEFB185845A983EDA31D" BuildableName = "WisperVoiceTests.xctest" BlueprintName = "WisperVoiceTests" ReferencedContainer = "container:WisperVoice.xcodeproj"></BuildableReference>
+         </BuildActionEntry>
+      </BuildActionEntries>
+   </BuildAction>
+   <TestAction buildConfiguration = "Debug" selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB" selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB" shouldUseLaunchSchemeArgsEnv = "YES" shouldAutocreateTestPlanWithNaturalLanguageAutomatic = "YES" codeCoverageEnabled = "YES">
+      <Testables>
+         <TestableReference skipped = "NO" parallelizable = "YES">
+            <BuildableReference BuildableIdentifier = "primary" BlueprintIdentifier = "D190BEFB185845A983EDA31D" BuildableName = "WisperVoiceTests.xctest" BlueprintName = "WisperVoiceTests" ReferencedContainer = "container:WisperVoice.xcodeproj"></BuildableReference>
+         </TestableReference>
+      </Testables>
+   </TestAction>
+   <LaunchAction buildConfiguration = "Debug" selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB" selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB" launchStyle = "0" useCustomWorkingDirectory = "NO" ignoresPersistentStateOnLaunch = "NO" debugDocumentVersioning = "YES" debugServiceExtension = "internal" allowLocationSimulation = "YES">
+      <BuildableReference BuildableIdentifier = "primary" BlueprintIdentifier = "TARGET_APP" BuildableName = "WisperVoice.app" BlueprintName = "WisperVoice" ReferencedContainer = "container:WisperVoice.xcodeproj"></BuildableReference>
+      <MacroExpansion>
+         <BuildableReference BuildableIdentifier = "primary" BlueprintIdentifier = "TARGET_APP" BuildableName = "WisperVoice.app" BlueprintName = "WisperVoice" ReferencedContainer = "container:WisperVoice.xcodeproj"></BuildableReference>
+      </MacroExpansion>
+   </LaunchAction>
+   <ProfileAction buildConfiguration = "Release" shouldUseLaunchSchemeArgsEnv = "YES" savedToolIdentifier = "" useCustomWorkingDirectory = "NO" debugDocumentVersioning = "YES">
+      <BuildableReference BuildableIdentifier = "primary" BlueprintIdentifier = "TARGET_APP" BuildableName = "WisperVoice.app" BlueprintName = "WisperVoice" ReferencedContainer = "container:WisperVoice.xcodeproj"></BuildableReference>
+   </ProfileAction>
+   <AnalyzeAction buildConfiguration = "Debug"></AnalyzeAction>
+   <ArchiveAction buildConfiguration = "Release" revealArchiveInOrganizer = "YES">
+      <BuildableReference BuildableIdentifier = "primary" BlueprintIdentifier = "TARGET_APP" BuildableName = "WisperVoice.app" BlueprintName = "WisperVoice" ReferencedContainer = "container:WisperVoice.xcodeproj"></BuildableReference>
+   </ArchiveAction>
+</Scheme>

@@ -1,0 +1,83 @@
+name: Bug report
+description: Report a reproducible bug
+title: "[Bug] "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! Please fill in all sections — it helps us fix things faster.
+  - type: input
+    id: version
+    attributes:
+      label: WisperVoice version
+      description: Tag or commit (e.g. v1.0.0, main@abc1234)
+      placeholder: v1.0.0
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+      placeholder: macOS 14.5 (23F79)
+    validations:
+      required: true
+  - type: input
+    id: xcode
+    attributes:
+      label: Xcode version
+      placeholder: Xcode 16.2
+    validations:
+      required: false
+  - type: dropdown
+    id: provider
+    attributes:
+      label: Transcription provider
+      options: [Apple Speech, OpenAI Whisper, Local model, Not sure]
+    validations:
+      required: false
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Minimal steps — what hotkey, what app was focused, what you said
+      placeholder: |
+        1. Launch WisperVoice
+        2. Press Option+Space in Notes
+        3. Say "hello world"
+        4. Press hotkey again — no text appears
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      placeholder: Text "hello world" should be pasted at cursor
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      placeholder: Nothing happens / overlay stuck on Recording / error banner …
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / screenshots
+      description: Console.app logs, `xcodebuild` output, or overlay screenshot
+      render: shell
+    validations:
+      required: false
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I searched existing issues and this is not a duplicate
+          required: true
+        - label: I granted Microphone / Speech / Accessibility permissions
+          required: false
+        - label: I tried restarting the app
+          required: false

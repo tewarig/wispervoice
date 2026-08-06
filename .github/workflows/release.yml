@@ -1,0 +1,220 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release (e.g. v1.0.0)"
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build, Zip & Publish Release
+    runs-on: macos-14
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve version
+        id: version
+        run: |
+          if [ -n "${{ inputs.tag }}" ]; then
+            TAG="${{ inputs.tag }}"
+          else
+            TAG="${GITHUB_REF#refs/tags/}"
+          fi
+          # Fallback for workflow_dispatch without tag on main
+          if [ -z "$TAG" ] || [ "$TAG" = "refs/heads/main" ]; then
+            TAG="v0.0.0-dev-${GITHUB_SHA::7}"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+          echo "Resolved tag: $TAG"
+
+      - name: Select Xcode
+        run: |
+          sudo xcode-select -s /Applications/Xcode_16.2.app/Contents/Developer 2>/dev/null \
+            || sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+          xcodebuild -version
+
+      - name: Build Release app
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project WisperVoice.xcodeproj \
+            -scheme WisperVoice \
+            -configuration Release \
+            -destination 'platform=macOS' \
+            -derivedDataPath /tmp/wisper_release_build \
+            CODE_SIGNING_ALLOWED=NO \
+            | xcpretty --color || xcodebuild build \
+            -project WisperVoice.xcodeproj \
+            -scheme WisperVoice \
+            -configuration Release \
+            -destination 'platform=macOS' \
+            -derivedDataPath /tmp/wisper_release_build \
+            CODE_SIGNING_ALLOWED=NO
+
+          APP_SRC="/tmp/wisper_release_build/Build/Products/Release/WisperVoice.app"
+          if [ ! -d "$APP_SRC" ]; then
+            echo "Release app not found at $APP_SRC"
+            ls -R /tmp/wisper_release_build 2>/dev/null | head -n 100
+            exit 1
+          fi
+          echo "App built at $APP_SRC"
+          ls -lh "$APP_SRC"
+
+      # ── Code signing & notarization (placeholder) ──────────────────
+      # To enable real signing, add these repository secrets:
+      #   APPLE_TEAM_ID, APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD,
+      #   DEVELOPER_ID_CERTIFICATE_P12 (base64), P12_PASSWORD, KEYCHAIN_PASSWORD
+      # and uncomment the blocks below. See SECURITY.md for details.
+
+      - name: Import Developer ID certificate (placeholder)
+        if: ${{ secrets.DEVELOPER_ID_CERTIFICATE_P12 != '' }}
+        env:
+          CERT_P12: ${{ secrets.DEVELOPER_ID_CERTIFICATE_P12 }}
+          P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          echo "$CERT_P12" | base64 --decode > /tmp/certificate.p12
+          security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain || true
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security import /tmp/certificate.p12 -k build.keychain -P "$P12_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
+          rm /tmp/certificate.p12
+
+      - name: Code sign app (if certificate available)
+        if: ${{ secrets.DEVELOPER_ID_CERTIFICATE_P12 != '' }}
+        run: |
+          APP="/tmp/wisper_release_build/Build/Products/Release/WisperVoice.app"
+          # Sign with hardened runtime; replace TEAM_ID with your Apple Team ID
+          codesign --force --deep --options runtime \
+            --sign "Developer ID Application" \
+            --entitlements WisperVoice/WisperVoice.entitlements \
+            "$APP" || echo "codesign failed — check certificate / entitlements"
+          codesign --verify --verbose=2 "$APP" || true
+          spctl -a -vvv "$APP" || true
+
+      - name: Notarization placeholder
+        if: ${{ secrets.APPLE_ID != '' && secrets.APPLE_APP_SPECIFIC_PASSWORD != '' }}
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          APP="/tmp/wisper_release_build/Build/Products/Release/WisperVoice.app"
+          ZIP_TMP="/tmp/WisperVoice-notary.zip"
+          ditto -c -k --keepParent "$APP" "$ZIP_TMP"
+          echo "Submitting for notarization (this may take several minutes)..."
+          xcrun notarytool submit "$ZIP_TMP" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait || echo "Notarization submit failed — see logs above"
+          # Staple if notarization succeeded
+          xcrun stapler staple "$APP" || echo "Stapling skipped/failed"
+          rm -f "$ZIP_TMP"
+
+      - name: Notarization — skipped (no secrets)
+        if: ${{ secrets.APPLE_ID == '' }}
+        run: |
+          echo "::notice::Notarization skipped — set APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID secrets to enable."
+          echo "To enable notarization, see .github/workflows/release.yml and SECURITY.md."
+
+      # ── Package ────────────────────────────────────────────────────
+
+      - name: Create .app zip
+        run: |
+          APP="/tmp/wisper_release_build/Build/Products/Release/WisperVoice.app"
+          VERSION="${{ steps.version.outputs.version }}"
+          ZIP_NAME="WisperVoice-${VERSION}-macOS.zip"
+          # Use ditto to preserve code signature, permissions, and resource forks
+          ditto -c -k --keepParent "$APP" "$ZIP_NAME"
+          # Also create an unsigned-named artifact for consistency
+          cp "$ZIP_NAME" WisperVoice-macOS.zip || true
+          ls -lh *.zip
+          shasum -a 256 *.zip | tee checksums.txt
+          echo "zip_name=$ZIP_NAME" >> "$GITHUB_ENV"
+
+      - name: Create DMG (best-effort)
+        continue-on-error: true
+        run: |
+          APP="/tmp/wisper_release_build/Build/Products/Release/WisperVoice.app"
+          VERSION="${{ steps.version.outputs.version }}"
+          DMG_NAME="WisperVoice-${VERSION}-macOS.dmg"
+          # hdiutil-based DMG; falls back gracefully if create-dmg not installed
+          if command -v create-dmg >/dev/null 2>&1; then
+            create-dmg --volname "WisperVoice ${VERSION}" --window-size 540 380 --app-drop-link 450 180 "$DMG_NAME" "$APP" || true
+          else
+            DMG_TMP="/tmp/wisper_dmg"
+            rm -rf "$DMG_TMP" && mkdir -p "$DMG_TMP"
+            cp -R "$APP" "$DMG_TMP/"
+            ln -s /Applications "$DMG_TMP/Applications" || true
+            hdiutil create -volname "WisperVoice ${VERSION}" -srcfolder "$DMG_TMP" -ov -format UDZO "$DMG_NAME" || echo "hdiutil DMG creation failed"
+            rm -rf "$DMG_TMP"
+          fi
+          ls -lh *.dmg 2>/dev/null || echo "No DMG produced"
+          shasum -a 256 *.dmg 2>/dev/null | tee -a checksums.txt || true
+
+      - name: Generate release notes
+        run: |
+          TAG="${{ steps.version.outputs.tag }}"
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          echo "Previous tag: ${PREV_TAG:-none}"
+          {
+            echo "## WisperVoice ${TAG}"
+            echo ""
+            if [ -n "$PREV_TAG" ]; then
+              echo "### Changes since ${PREV_TAG}"
+              git log "${PREV_TAG}..HEAD" --pretty=format:"- %s (%h)" --no-merges | head -n 100
+              echo ""
+              echo ""
+            fi
+            echo "### Install"
+            echo '```bash'
+            echo "# Download and unzip, then move to Applications:"
+            echo "unzip WisperVoice-*.zip"
+            echo "mv WisperVoice.app /Applications/"
+            echo '```'
+            echo ""
+            echo "Grant **Microphone**, **Speech Recognition**, and **Accessibility** when prompted (System Settings → Privacy & Security)."
+            echo ""
+            echo "### Checksums"
+            echo '```'
+            cat checksums.txt 2>/dev/null || echo "(checksums not generated)"
+            echo '```'
+          } > release_notes.md
+          cat release_notes.md
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: WisperVoice ${{ steps.version.outputs.tag }}
+          body_path: release_notes.md
+          draft: false
+          prerelease: ${{ contains(steps.version.outputs.tag, '-beta') || contains(steps.version.outputs.tag, '-alpha') || contains(steps.version.outputs.tag, '-rc') }}
+          generate_release_notes: true
+          files: |
+            WisperVoice-*.zip
+            WisperVoice-*.dmg
+            checksums.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

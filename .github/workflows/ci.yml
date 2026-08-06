@@ -1,0 +1,163 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Build + Test + Coverage
+    runs-on: macos-14
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: |
+          sudo xcode-select -s /Applications/Xcode_16.2.app/Contents/Developer 2>/dev/null \
+            || sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+          xcodebuild -version
+          swift --version
+
+      - name: Cache SPM
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Caches/org.swift.swiftpm
+            ~/Library/org.swift.swiftpm
+            SourcePackages
+          key: ${{ runner.os }}-spm-${{ hashFiles('**/Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-spm-
+
+      - name: Cache DerivedData
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Developer/Xcode/DerivedData
+          key: ${{ runner.os }}-deriveddata-${{ hashFiles('WisperVoice.xcodeproj/project.pbxproj') }}
+          restore-keys: |
+            ${{ runner.os }}-deriveddata-
+
+      - name: Build (Debug)
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project WisperVoice.xcodeproj \
+            -scheme WisperVoice \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            CODE_SIGNING_ALLOWED=NO \
+            | xcpretty --color || xcodebuild build \
+            -project WisperVoice.xcodeproj \
+            -scheme WisperVoice \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Test with coverage
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -project WisperVoice.xcodeproj \
+            -scheme WisperVoice \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            -enableCodeCoverage YES \
+            -resultBundlePath TestResults.xcresult \
+            CODE_SIGNING_ALLOWED=NO \
+            | xcpretty --color || xcodebuild test \
+            -project WisperVoice.xcodeproj \
+            -scheme WisperVoice \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            -enableCodeCoverage YES \
+            -resultBundlePath TestResults.xcresult \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Generate coverage report
+        if: always()
+        run: |
+          if [ -d TestResults.xcresult ]; then
+            xcrun xccov view --report --json TestResults.xcresult > coverage.json || true
+            xcrun xccov view --report TestResults.xcresult || true
+            echo "## Coverage summary" >> "$GITHUB_STEP_SUMMARY"
+            xcrun xccov view --report TestResults.xcresult >> "$GITHUB_STEP_SUMMARY" 2>&1 || echo "No coverage data" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No TestResults.xcresult found" | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+          if command -v llvm-cov >/dev/null 2>&1; then
+            echo "llvm-cov available: $(llvm-cov --version | head -n1)"
+          fi
+
+      - name: Upload coverage artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: |
+            TestResults.xcresult
+            coverage.json
+          if-no-files-found: warn
+
+      - name: Upload coverage to Codecov
+        if: always()
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage.json
+          fail_ci_if_error: false
+          verbose: true
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Lint — SwiftLint (best-effort)
+        if: always()
+        run: |
+          if command -v swiftlint >/dev/null 2>&1; then
+            swiftlint lint --reporter github-actions-logging || true
+          else
+            echo "SwiftLint not installed — skipping (brew install swiftlint to run locally)"
+          fi
+
+  build-release:
+    name: Build Release (no sign)
+    runs-on: macos-14
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode
+        run: |
+          sudo xcode-select -s /Applications/Xcode_16.2.app/Contents/Developer 2>/dev/null \
+            || sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+          xcodebuild -version
+      - name: Archive (Release, unsigned)
+        run: |
+          set -o pipefail
+          xcodebuild archive \
+            -project WisperVoice.xcodeproj \
+            -scheme WisperVoice \
+            -configuration Release \
+            -destination 'generic/platform=macOS' \
+            -archivePath WisperVoice.xcarchive \
+            CODE_SIGNING_ALLOWED=NO \
+            SKIP_INSTALL=NO \
+            | xcpretty --color || xcodebuild archive \
+            -project WisperVoice.xcodeproj \
+            -scheme WisperVoice \
+            -configuration Release \
+            -destination 'generic/platform=macOS' \
+            -archivePath WisperVoice.xcarchive \
+            CODE_SIGNING_ALLOWED=NO \
+            SKIP_INSTALL=NO
+      - name: Verify archive
+        run: |
+          ls -R WisperVoice.xcarchive 2>/dev/null | head -n 80
+          test -d WisperVoice.xcarchive || (echo "Archive not created" && exit 1)
