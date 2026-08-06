@@ -21,7 +21,7 @@ struct ClipboardHistoryView: View {
                 List {
                     ForEach(filtered) { item in
                         VStack(alignment: .leading, spacing: 6) {
-                            Text(item.text).font(.system(size: 13, design: .rounded)).lineSpacing(2).textSelection(.enabled)
+                            Text(item.text).font(Theme.transcript).lineSpacing(2).textSelection(.enabled)
                             HStack(spacing: 8) {
                                 Text(item.date, style: .relative).font(.caption2).foregroundStyle(.tertiary)
                                 if !item.provider.isEmpty { Text("• \(item.provider)").font(.caption2).foregroundStyle(.tertiary).lineLimit(1) }
@@ -31,7 +31,7 @@ struct ClipboardHistoryView: View {
                                     NSPasteboard.general.setString(item.text, forType: .string)
                                     withAnimation { copiedId = item.id }
                                     DispatchQueue.main.asyncAfter(deadline: .now()+1.2){ withAnimation { copiedId = nil } }
-                                }.buttonStyle(.bordered).controlSize(.mini).tint(copiedId == item.id ? .green : .accentColor)
+                                }.buttonStyle(.bordered).controlSize(.mini).tint(Theme.accent)
                                 Button("Paste") { TextInjector.inject(text: item.text) }.buttonStyle(.borderedProminent).controlSize(.mini)
                             }
                         }

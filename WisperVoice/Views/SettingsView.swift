@@ -188,7 +188,7 @@ struct SettingsView: View {
                             Spacer()
                             if m.isDownloaded {
                                 if modelManager.activeModelId == m.id {
-                                    Label("Active", systemImage: "checkmark.circle.fill").font(.caption.weight(.semibold)).foregroundStyle(.green)
+                                    Label("Active", systemImage: "checkmark.circle.fill").font(.caption.weight(.semibold)).foregroundStyle(Theme.accent)
                                 } else {
                                     Button("Use") { modelManager.select(m.id) }.buttonStyle(.bordered).controlSize(.small)
                                 }
@@ -219,10 +219,10 @@ struct SettingsView: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(m.displayName).font(.callout.weight(.medium))
                                 HStack(spacing: 4) {
-                                    Text(m.providerId).font(.caption2.weight(.semibold)).foregroundStyle(.blue)
+                                    Text(m.providerId).font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
                                     Text("• \(m.sizeMB) MB • \(m.fileName)").font(.caption2).foregroundStyle(.secondary).lineLimit(1)
                                 }
-                                if m.isDownloaded { Text(m.localPath?.path ?? "Downloaded").font(.caption2).foregroundStyle(.green).lineLimit(1) }
+                                if m.isDownloaded { Text(m.localPath?.path ?? "Downloaded").font(.caption2).foregroundStyle(Theme.accent).lineLimit(1) }
                                 if let prog = modelManager.aiDownloadProgress[m.id], modelManager.aiDownloadingId == m.id {
                                     ProgressView(value: prog).controlSize(.mini).frame(width: 160)
                                 }
@@ -230,7 +230,7 @@ struct SettingsView: View {
                             Spacer()
                             if m.isDownloaded {
                                 if modelManager.selectedSTTModelId == m.id {
-                                    Label("Active", systemImage: "checkmark.circle.fill").font(.caption.weight(.semibold)).foregroundStyle(.green)
+                                    Label("Active", systemImage: "checkmark.circle.fill").font(.caption.weight(.semibold)).foregroundStyle(Theme.accent)
                                 } else {
                                     Button("Use") { modelManager.selectSTT(providerId: m.providerId, modelId: m.id) }.buttonStyle(.bordered).controlSize(.small)
                                 }
@@ -258,10 +258,10 @@ struct SettingsView: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(m.displayName).font(.callout.weight(.medium))
                                 HStack(spacing: 4) {
-                                    Text(m.providerId).font(.caption2.weight(.semibold)).foregroundStyle(.purple)
+                                    Text(m.providerId).font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
                                     Text("• \(m.sizeMB) MB • \(m.fileName)").font(.caption2).foregroundStyle(.secondary).lineLimit(1)
                                 }
-                                if m.isDownloaded { Text(m.localPath?.path ?? "Downloaded").font(.caption2).foregroundStyle(.green).lineLimit(1) }
+                                if m.isDownloaded { Text(m.localPath?.path ?? "Downloaded").font(.caption2).foregroundStyle(Theme.accent).lineLimit(1) }
                                 if let prog = modelManager.aiDownloadProgress[m.id], modelManager.aiDownloadingId == m.id {
                                     ProgressView(value: prog).controlSize(.mini).frame(width: 160)
                                     Text("Downloading \(Int((prog)*100))%").font(.caption2).foregroundStyle(.secondary)
@@ -270,7 +270,7 @@ struct SettingsView: View {
                             Spacer()
                             if m.isDownloaded {
                                 if modelManager.selectedTTSModelId == m.id {
-                                    Label("Active", systemImage: "checkmark.circle.fill").font(.caption.weight(.semibold)).foregroundStyle(.green)
+                                    Label("Active", systemImage: "checkmark.circle.fill").font(.caption.weight(.semibold)).foregroundStyle(Theme.accent)
                                 } else {
                                     Button("Use") { modelManager.selectTTS(providerId: m.providerId, modelId: m.id) }.buttonStyle(.bordered).controlSize(.small)
                                 }

@@ -1,6 +1,7 @@
 import Foundation
 import SwiftUI
 import AVFoundation
+import ApplicationServices
 import Combine
 import Speech
 
@@ -43,6 +44,9 @@ final class DictationManager: ObservableObject {
     private var bufferRequest: SFSpeechAudioBufferRecognitionRequest?
     private var silenceStart: Date?
     private var silenceTimer: Timer?
+    /// The app that was frontmost when recording began — where the transcript must land.
+    /// Snapshotted at start so an app activating mid-dictation cannot hijack the paste.
+    private var targetApp: NSRunningApplication?
 
     init() {
         hotkeyManager.onHotkeyPressed = { [weak self] in
@@ -66,6 +70,8 @@ final class DictationManager: ObservableObject {
         errorMessage = nil
         liveTranscript = ""
         guard state == .idle else { return }
+        targetApp = FocusTracker.shared.lastExternalApp
+        FocusLog.log("startRecording: captured target=\(targetApp?.localizedName ?? "nil"), axTrusted=\(AXIsProcessTrusted())")
         do {
             recordingURL = try recorder.startRecording()
             state = .recording
@@ -130,7 +136,7 @@ final class DictationManager: ObservableObject {
                     state = .injecting
                     updateOverlay()
                     try await Task.sleep(nanoseconds: 250_000_000)
-                    TextInjector.inject(text: lastTranscript)
+                    TextInjector.inject(text: lastTranscript, target: targetApp)
                     NSSound(named: "Glass")?.play()
                 }
                 state = .idle
@@ -141,7 +147,7 @@ final class DictationManager: ObservableObject {
                 if !fallbackLive.isEmpty {
                     lastTranscript = fallbackLive
                     HistoryStore.shared.add(fallbackLive)
-                    if autoPaste { TextInjector.inject(text: fallbackLive) }
+                    if autoPaste { TextInjector.inject(text: fallbackLive, target: targetApp) }
                 } else {
                     errorMessage = error.localizedDescription
                 }

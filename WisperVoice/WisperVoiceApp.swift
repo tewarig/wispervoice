@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import ApplicationServices
 import ServiceManagement
 
 @main
@@ -61,8 +62,8 @@ struct ContentView: View {
         VStack(spacing: 16) {
             Image(systemName: "waveform.and.mic")
                 .font(.system(size: 48, weight: .light))
-                .foregroundStyle(LinearGradient(colors: [.purple, .indigo], startPoint: .topLeading, endPoint: .bottomTrailing))
-            Text("WisperVoice").font(.largeTitle.weight(.semibold).monospacedDigit())
+                .foregroundStyle(Theme.accent)
+            Text("WisperVoice").font(.largeTitle.weight(.semibold))
             Text("Speak in any app — Option+Space or Fn×2")
                 .font(.callout).foregroundStyle(.secondary)
             Button(dictation.state == .recording ? "Stop Recording" : "Start Dictating") {
@@ -77,7 +78,7 @@ struct ContentView: View {
             Button("Show Walkthrough") { showOnboarding = true }.font(.caption).buttonStyle(.borderless)
             if !permissions.allGranted {
                 Text("Grant Microphone / Accessibility in Settings to enable everywhere.")
-                    .font(.caption2).foregroundStyle(.orange).multilineTextAlignment(.center)
+                    .font(.caption2).foregroundStyle(Theme.alert).multilineTextAlignment(.center)
             }
             if !dictation.lastTranscript.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
@@ -90,7 +91,7 @@ struct ContentView: View {
                         }.font(.caption).buttonStyle(.bordered).controlSize(.mini)
                         Button("Paste Again") { TextInjector.inject(text: dictation.lastTranscript) }.font(.caption).buttonStyle(.borderedProminent).controlSize(.mini)
                     }
-                    Text(dictation.lastTranscript).font(.system(size: 12, design: .rounded)).padding(8).background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
+                    Text(dictation.lastTranscript).font(Theme.transcript).padding(8).background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
                         .textSelection(.enabled).lineLimit(4)
                 }.padding(.top, 8)
             }
@@ -114,6 +115,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate(ignoringOtherApps: false)
         // Ensure overlay singleton is created early
         _ = OverlayWindow.sharedInstance
+        // Start tracking the frontmost app from launch so the first dictation has a paste target
+        _ = FocusTracker.shared
         // Fallback NSStatusItem so icon never disappears (MenuBarExtra may hide on some configs / Bartender)
         if statusItem == nil {
             statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -132,6 +135,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NotificationCenter.default.addObserver(self, selector: #selector(ensureStatusItem), name: NSApplication.didChangeScreenParametersNotification, object: nil)
         // Also check 1s after launch in case MenuBarExtra failed to attach
         DispatchQueue.main.asyncAfter(deadline: .now()+1.0) { self.ensureStatusItem() }
+        FocusLog.log("launch: axTrusted=\(AXIsProcessTrusted()) build=\(Bundle.main.bundleIdentifier ?? "?")")
         PermissionsManager.checkAll()
         PermissionsManager.requestMicrophonePermission()
         // Auto-register for startup if user enabled before

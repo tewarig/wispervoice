@@ -1,7 +1,9 @@
 import AppKit
 import SwiftUI
 
-final class OverlayWindow: NSWindow {
+/// Non-activating HUD panel. Must NEVER take focus from the app the user is dictating into —
+/// it is an NSPanel with `.nonactivatingPanel` so ordering it in leaves Slack/Chrome frontmost.
+final class OverlayWindow: NSPanel {
     // Singleton independent of AppDelegate — fixes pill not showing
     static let sharedInstance = OverlayWindow()
     static var shared: OverlayWindow? { sharedInstance }
@@ -9,10 +11,14 @@ final class OverlayWindow: NSWindow {
     var onClose: (() -> Void)?
 
     private var hosting: NSHostingView<OverlayView>?
+    /// Window ordering/positioning happens once per presentation, not on every content update.
+    private var isPresented = false
+    /// Invalidates an in-flight fade-out when a new `show()` supersedes it.
+    private var hideToken = 0
 
     init() {
         let rect = NSRect(x: 0, y: 0, width: 420, height: 72)
-        super.init(contentRect: rect, styleMask: .borderless, backing: .buffered, defer: false)
+        super.init(contentRect: rect, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         isOpaque = false
         backgroundColor = .clear
         hasShadow = false
@@ -22,6 +28,10 @@ final class OverlayWindow: NSWindow {
         isMovableByWindowBackground = false
         hidesOnDeactivate = false
         hasShadow = true
+        // Only grab key status if the user actually clicks a control in the pill
+        becomesKeyOnlyIfNeeded = true
+        isFloatingPanel = true
+        worksWhenModal = true
         center()
         if let screen = NSScreen.main {
             let x = screen.frame.midX - rect.width/2
@@ -35,9 +45,24 @@ final class OverlayWindow: NSWindow {
         orderOut(nil)
     }
 
+    /// Present the pill and/or refresh its contents.
+    ///
+    /// This is called at audio-level rate (~12×/s) while recording, so only the SwiftUI
+    /// root view is swapped on the hot path. Window ordering and repositioning run once per
+    /// presentation — and never activate the app, which would steal focus from the app the
+    /// user is dictating into.
     func show(state: DictationState, level: Float, transcript: String) {
-        let view = OverlayView(state: state, level: level, transcript: transcript, onCopy: { [weak self] t in self?.copyTranscript(t) }, onClose: { [weak self] in self?.onClose?() })
-        hosting?.rootView = view
+        hosting?.rootView = OverlayView(state: state, level: level, transcript: transcript, onCopy: { [weak self] t in self?.copyTranscript(t) }, onClose: { [weak self] in self?.onClose?() })
+
+        // The pill floats at bottom-centre — directly over the message composer in Slack/Discord/
+        // Chrome. While the user is talking it must not intercept clicks meant for that field;
+        // it only becomes clickable once there is a result worth copying.
+        ignoresMouseEvents = (state == .recording || state == .transcribing)
+
+        hideToken &+= 1              // supersede any fade-out already in flight
+        guard !isPresented || !isVisible else { return }
+        isPresented = true
+
         // Ensure visible on active Space even when Chrome/fullscreen frontmost
         self.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary, .ignoresCycle]
         self.level = .statusBar
@@ -60,12 +85,18 @@ final class OverlayWindow: NSWindow {
             self.setFrameOrigin(NSPoint(x: clampedX, y: clampedY))
         }
         DispatchQueue.main.async {
+            // Retarget any running fade-out back to opaque before ordering in
+            NSAnimationContext.runAnimationGroup { ctx in
+                ctx.duration = 0
+                self.animator().alphaValue = 1
+            }
+            // orderFrontRegardless only — no makeKey, no NSApp.activate: the frontmost app keeps focus
             self.orderFrontRegardless()
-            self.alphaValue = 1
-            self.makeKeyAndOrderFront(nil)
-            NSApp.activate(ignoringOtherApps: false)
         }
     }
+
+    /// The pill is a HUD: it must never become the app's main window.
+    override var canBecomeMain: Bool { false }
 
     private func copyTranscript(_ text: String) {
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
@@ -78,12 +109,16 @@ final class OverlayWindow: NSWindow {
     func updateLevel(_ level: Float) {}
 
     func hide() {
+        hideToken &+= 1
+        let token = hideToken
         NSAnimationContext.runAnimationGroup { ctx in
             ctx.duration = 0.22
             animator().alphaValue = 0
-        } completionHandler: {
+        } completionHandler: { [weak self] in
+            guard let self, self.hideToken == token else { return } // a show() superseded this hide
             self.orderOut(nil)
             self.alphaValue = 1
+            self.isPresented = false
         }
     }
 }
@@ -105,7 +140,7 @@ struct OverlayView: View {
                 Circle()
                     .fill(.ultraThinMaterial)
                     .frame(width: 42, height: 42)
-                    .overlay(Circle().stroke(.white.opacity(0.18), lineWidth: 1))
+                    .overlay(Circle().stroke(Theme.onGlass.opacity(Theme.softFill), lineWidth: 1))
                     .shadow(color: colorForState.opacity(0.18), radius: 8, y: 4)
                 Image(systemName: iconForState)
                     .font(.system(size: 16, weight: .semibold))
@@ -125,9 +160,9 @@ struct OverlayView: View {
                 HStack(spacing: 6) {
                     Text(titleForState)
                         .font(.system(size: 13.5, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Theme.onGlassPrimary)
                     if state == .recording {
-                        Circle().fill(.red).frame(width: 6, height: 6).symbolEffect(.pulse)
+                        Circle().fill(Theme.alert).frame(width: 6, height: 6).symbolEffect(.pulse)
                     }
                 }
                 Group {
@@ -135,29 +170,29 @@ struct OverlayView: View {
                         // Live dictation text
                         if transcript.isEmpty {
                             Text("Listening… press again to stop")
-                                .font(.system(size: 11.5, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.72))
+                                .font(Theme.compact)
+                                .foregroundStyle(Theme.onGlassSecondary)
                         } else {
                             Text(transcript)
-                                .font(.system(size: 11.5, design: .rounded))
-                                .foregroundStyle(.white)
+                                .font(Theme.compact)
+                                .foregroundStyle(Theme.onGlassPrimary)
                                 .lineLimit(1)
                                 .contentTransition(.opacity)
                         }
                     } else if !transcript.isEmpty && state != .recording {
                         Text(transcript)
-                            .font(.system(size: 11.5, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.78))
+                            .font(Theme.compact)
+                            .foregroundStyle(Theme.onGlassSecondary)
                             .lineLimit(1)
                     } else if state == .transcribing {
                         HStack(spacing: 6) {
-                            ProgressView().controlSize(.mini).tint(.white)
-                            Text("Transcribing…").font(.system(size: 11.5)).foregroundStyle(.white.opacity(0.7))
+                            ProgressView().controlSize(.mini).tint(Theme.onGlassPrimary)
+                            Text("Transcribing…").font(Theme.compact).foregroundStyle(Theme.onGlassSecondary)
                         }
                     } else if state == .injecting {
-                        Text("Pasted at cursor ✓").font(.system(size: 11.5)).foregroundStyle(.white.opacity(0.7))
+                        Text("Pasted at cursor ✓").font(Theme.compact).foregroundStyle(Theme.onGlassSecondary)
                     } else {
-                        Text("⌥Space  •  Fn×2  to dictate").font(.system(size: 11)).foregroundStyle(.white.opacity(0.55))
+                        Text("⌥Space  •  Fn×2  to dictate").font(Theme.compact).foregroundStyle(Theme.onGlassSecondary)
                     }
                 }
             }
@@ -168,7 +203,7 @@ struct OverlayView: View {
                 HStack(spacing: 3) {
                     ForEach(0..<5, id: \.self) { i in
                         RoundedRectangle(cornerRadius: 2, style: .continuous)
-                            .fill(LinearGradient(colors: [.white, .white.opacity(0.85)], startPoint: .top, endPoint: .bottom))
+                            .fill(Theme.onGlassPrimary)
                             .frame(width: 3, height: 10 + CGFloat(level) * 16 * (i % 2 == 0 ? 1 : 0.55) + CGFloat(i) * 1.2)
                             .animation(.easeInOut(duration: 0.18).delay(Double(i)*0.04), value: level)
                     }
@@ -190,8 +225,8 @@ struct OverlayView: View {
                     }
                     .foregroundStyle(.white)
                     .padding(.horizontal, 10).padding(.vertical, 6)
-                    .background(didCopy ? Color.green.opacity(0.9) : Color.white.opacity(0.14), in: Capsule())
-                    .overlay(Capsule().stroke(.white.opacity(0.14), lineWidth: 1))
+                    .background(didCopy ? Theme.accent : Theme.onGlass.opacity(Theme.subtleFill), in: Capsule())
+                    .overlay(Capsule().stroke(Theme.onGlass.opacity(Theme.hairline), lineWidth: 1))
                 }
                 .buttonStyle(.plain)
                 .keyboardShortcut("c", modifiers: .command)
@@ -205,8 +240,8 @@ struct OverlayView: View {
                 Button(action: { onClose?() }) {
                     Image(systemName: "xmark.circle.fill")
                         .font(.system(size: 18))
-                        .foregroundStyle(.white.opacity(0.75))
-                        .background(Circle().fill(.white.opacity(0.12)))
+                        .foregroundStyle(Theme.onGlassSecondary)
+                        .background(Circle().fill(Theme.onGlass.opacity(Theme.subtleFill)))
                 }
                 .buttonStyle(.plain)
                 .keyboardShortcut(.cancelAction)
@@ -218,9 +253,8 @@ struct OverlayView: View {
         .frame(width: 420, height: 72)
         .background {
             Capsule(style: .continuous)
-                .fill(Color.black.opacity(0.82))
-                .overlay(Capsule(style: .continuous).fill(.ultraThinMaterial.opacity(0.18)))
-                .overlay(Capsule(style: .continuous).strokeBorder(LinearGradient(colors: [.white.opacity(0.14), .white.opacity(0.04)], startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 1))
+                .fill(Theme.glassBody)
+                .overlay(Capsule(style: .continuous).strokeBorder(Theme.onGlass.opacity(Theme.hairline), lineWidth: 1))
                 .shadow(color: .black.opacity(0.22), radius: 22, y: 10)
                 .shadow(color: colorForState.opacity(state == .recording ? 0.18 : 0), radius: 18, y: 6)
         }
@@ -236,14 +270,7 @@ struct OverlayView: View {
         case .injecting: return "checkmark.circle.fill"
         }
     }
-    private var colorForState: Color {
-        switch state {
-        case .idle: return .white.opacity(0.9)
-        case .recording: return .red
-        case .transcribing: return .orange
-        case .injecting: return .green
-        }
-    }
+    private var colorForState: Color { Theme.onGlassColor(for: state) }
     private var titleForState: String {
         switch state {
         case .idle: return "WisperVoice"

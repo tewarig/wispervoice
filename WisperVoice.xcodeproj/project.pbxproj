@@ -19,6 +19,7 @@
 		BF_MENU /* MenuBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FR_MENU; };
 		BF_SETTINGS /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FR_SETTINGS; };
 		BF_ONBOARD /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FR_ONBOARD; };
+		BF_THEME /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = FR_THEME; };
 		BF_CLIP /* ClipboardHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FR_CLIP; };
 		BF_ASSETS /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = FR_ASSETS; };
 		D83B6B70C00247CBBBFC1739 /* TranscriptionServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E41F71B5F668472FAA08EC2B; };
@@ -65,6 +66,7 @@
 		FR_MENU = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarView.swift; sourceTree = "<group>"; };
 		FR_SETTINGS = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		FR_ONBOARD = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
+		FR_THEME = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		FR_CLIP = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipboardHistoryView.swift; sourceTree = "<group>"; };
 		FR_ASSETS = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		FR_ICON = {isa = PBXFileReference; lastKnownFileType = text.json; path = Contents.json; sourceTree = "<group>"; };
@@ -145,6 +147,7 @@
 				F7C433C8FC6D4B2C9598F86A,
 				BF121547E48E4A7C8A5341F4,
 				BF_ONBOARD,
+				BF_THEME,
 				BF_CLIP
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -223,6 +226,7 @@
 				FR_MENU,
 				FR_SETTINGS,
 				FR_ONBOARD,
+				FR_THEME,
 				FR_CLIP,
 			);
 			path = Views;
@@ -341,6 +345,7 @@
 				BF_MENU,
 				BF_SETTINGS,
 				BF_ONBOARD,
+				BF_THEME,
 				BF_CLIP,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
