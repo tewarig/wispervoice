@@ -9,42 +9,241 @@
 
 html {
   scroll-behavior: smooth;
-  scroll-padding-top: 72px;
+  scroll-padding-top: 80px;
 }
 
 body {
-  font-family: "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  background: #fcfcfe;
-  color: #0f111a;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #ffffff;
+  color: #111113;
+  text-rendering: optimizeLegibility;
 }
 
-/* Glass helper */
-.glass {
+html.dark body {
+  background: #09090b;
+  color: #fafafb;
+}
+
+html.dark .metallic-card,
+html.dark .metallic-pill,
+html.dark .metallic-secondary {
+  background: #1a1a1e;
+  border-color: #27272a;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.3),
+    0 8px 24px rgba(0, 0, 0, 0.25),
+    0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+html.dark .metallic-glass,
+html.dark .glass-nav,
+html.dark .glass-nav--scrolled {
+  background: rgba(24, 24, 27, 0.72);
+  border-color: rgba(39, 39, 42, 0.8);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+html.dark .bg-white { background-color: #1a1a1e !important; }
+html.dark .bg-surface { background-color: #121214 !important; }
+html.dark .bg-ink-900 { background-color: #fafafb !important; color: #09090b !important; }
+html.dark .text-ink-900 { color: #fafafb !important; }
+html.dark .text-ink-600 { color: #a1a1aa !important; }
+html.dark .text-ink-400 { color: #71717a !important; }
+html.dark .border-line { border-color: #27272a !important; }
+html.dark .bg-line { background-color: #27272a !important; }
+
+::selection {
+  background: #ede9fe;
+}
+
+/* Very subtle color emanations — every interactive color shift breathes */
+a, button {
+  transition-property: color, background-color, border-color, opacity;
+  transition-duration: 180ms;
+  transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
+a svg, button svg {
+  transition-property: transform, color, opacity;
+  transition-duration: 180ms;
+  transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Subtle focus */
+:focus-visible {
+  outline: 2px solid #6d5aff;
+  outline-offset: 2px;
+}
+
+/* Hairline divider */
+.hairline {
+  border-color: #e8e8ec;
+}
+
+/* Metallic — subtle brushed weight, inner + outer shadow */
+.metallic-glass {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.97) 0%, rgba(244, 244, 246, 0.93) 100%);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  border: 1px solid rgba(232, 232, 236, 0.96);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.96),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.04),
+    0 8px 24px rgba(17, 17, 19, 0.06),
+    0 1px 3px rgba(17, 17, 19, 0.05);
+}
+
+/* Topnav — true glass (frosted, translucent, weightless) */
+.glass-nav {
   background: rgba(255, 255, 255, 0.72);
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-bottom: 1px solid rgba(232, 232, 236, 0.65);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.85),
+    0 4px 16px rgba(17, 17, 19, 0.04);
 }
 
-.glass-dark {
-  background: rgba(15, 17, 26, 0.78);
-  backdrop-filter: blur(20px) saturate(150%);
-  -webkit-backdrop-filter: blur(20px) saturate(150%);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+.glass-nav--scrolled {
+  background: rgba(255, 255, 255, 0.84);
+  border-bottom-color: rgba(232, 232, 236, 0.9);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.92),
+    0 8px 24px rgba(17, 17, 19, 0.06),
+    0 1px 3px rgba(17, 17, 19, 0.04);
 }
 
-/* Grid pattern */
-.grid-pattern {
-  background-image:
-    linear-gradient(rgba(15, 17, 26, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(15, 17, 26, 0.03) 1px, transparent 1px);
-  background-size: 32px 32px;
+.metallic-dark {
+  background: linear-gradient(180deg, #2a2a2e 0%, #1a1a1e 38%, #111113 100%);
+  border: 1px solid #09090b;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.13),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.48),
+    0 6px 20px rgba(17, 17, 19, 0.18),
+    0 2px 6px rgba(17, 17, 19, 0.12);
+  transition:
+    transform 180ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 180ms cubic-bezier(0.16, 1, 0.3, 1),
+    background 180ms ease;
 }
 
-/* Gradient mesh */
-.mesh {
-  background:
-    radial-gradient(600px 400px at 20% 10%, rgba(124, 92, 252, 0.12) 0%, transparent 60%),
-    radial-gradient(700px 500px at 90% 20%, rgba(61, 214, 208, 0.10) 0%, transparent 60%),
-    radial-gradient(800px 600px at 50% 100%, rgba(124, 92, 252, 0.06) 0%, transparent 70%);
+.metallic-dark:hover {
+  background: linear-gradient(180deg, #323236 0%, #1e1e22 45%, #151519 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.15),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.5),
+    0 10px 28px rgba(17, 17, 19, 0.22),
+    0 4px 12px rgba(17, 17, 19, 0.14);
+  transform: translateY(-1px);
+}
+
+.metallic-dark:active {
+  transform: translateY(0);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.5),
+    0 3px 10px rgba(17, 17, 19, 0.14),
+    0 1px 3px rgba(17, 17, 19, 0.1);
+}
+
+/* Unified system — light cards/pills: whitish white + inner + outer shadow (no extra gradient unless button) */
+.metallic-card {
+  background: #ffffff;
+  border: 1px solid #e8e8ec;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.98),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.03),
+    0 8px 24px rgba(17, 17, 19, 0.05),
+    0 1px 3px rgba(17, 17, 19, 0.04);
+  transition:
+    box-shadow 180ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 180ms cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 180ms ease;
+}
+
+.metallic-card:hover {
+  border-color: #e0e0e6;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.98),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.03),
+    0 12px 32px rgba(17, 17, 19, 0.07),
+    0 2px 8px rgba(17, 17, 19, 0.05);
+}
+
+.metallic-pill {
+  background: #ffffff;
+  border: 1px solid #e8e8ec;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.98),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.02),
+    0 6px 16px rgba(17, 17, 19, 0.05),
+    0 1px 3px rgba(17, 17, 19, 0.04);
+}
+
+.metallic-secondary {
+  background: #ffffff;
+  border: 1px solid #e8e8ec;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.98),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.02),
+    0 4px 12px rgba(17, 17, 19, 0.05),
+    0 1px 3px rgba(17, 17, 19, 0.04);
+  transition:
+    box-shadow 180ms cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 180ms ease,
+    background 180ms ease;
+}
+
+.metallic-secondary:hover {
+  border-color: #e0e0e6;
+  background: #fcfcfd;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.98),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.02),
+    0 8px 20px rgba(17, 17, 19, 0.07),
+    0 2px 6px rgba(17, 17, 19, 0.05);
+}
+
+/* Hero cloud — enlarged, saturated blobs only */
+@keyframes hero-drift {
+  0% { transform: translateX(-50%) translate3d(-4%, 0, 0) scale(1); opacity: 0.92; }
+  50% { transform: translateX(-50%) translate3d(5%, -4%, 0) scale(1.05); opacity: 1; }
+  100% { transform: translateX(-50%) translate3d(-4%, 0, 0) scale(1); opacity: 0.92; }
+}
+@keyframes hero-glow {
+  0%, 100% { opacity: 0.75; transform: translateX(-50%) scale(1); }
+  50% { opacity: 1; transform: translateX(-50%) scale(1.08); }
+}
+@keyframes hero-glow-2 {
+  0%, 100% { opacity: 0.5; transform: translateX(-50%) translateY(0) scale(1); }
+  50% { opacity: 0.85; transform: translateX(-48%) translateY(-8px) scale(1.06); }
+}
+.hero-light {
+  animation: hero-drift 16s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+.hero-glow {
+  animation: hero-glow 12s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+.hero-glow-2 {
+  animation: hero-glow-2 14s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-light, .hero-glow, .hero-glow-2 { animation: none !important; }
+}
+html.dark .hero-light {
+  opacity: 0.55 !important;
+}
+html.dark .hero-glow {
+  opacity: 0.9 !important;
+}
+
+/* Smooth scrolling for reduced-motion users */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
