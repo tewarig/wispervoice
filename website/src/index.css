@@ -19,44 +19,54 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+/* Dark mode — pitch dark bg, lighter cards */
 html.dark body {
-  background: #09090b;
-  color: #fafafb;
+  background: #000000;
+  color: #f1f1f3;
 }
 
 html.dark .metallic-card,
 html.dark .metallic-pill,
 html.dark .metallic-secondary {
-  background: #1a1a1e;
-  border-color: #27272a;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.06),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.3),
-    0 8px 24px rgba(0, 0, 0, 0.25),
-    0 1px 3px rgba(0, 0, 0, 0.2);
+  background: #18181b; /* lighter than body — elevated */
+  border-color: #2e2e32; /* better border — visible but not harsh */
+  box-shadow: none; /* remove shadows in dark — flatter */
 }
 
 html.dark .metallic-glass,
 html.dark .glass-nav,
 html.dark .glass-nav--scrolled {
-  background: rgba(24, 24, 27, 0.72);
-  border-color: rgba(39, 39, 42, 0.8);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.06),
-    0 4px 16px rgba(0, 0, 0, 0.2);
+  background: rgba(24, 24, 27, 0.88);
+  border-color: #2e2e32;
+  box-shadow: none;
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
 }
 
-html.dark .bg-white { background-color: #1a1a1e !important; }
-html.dark .bg-surface { background-color: #121214 !important; }
-html.dark .bg-ink-900 { background-color: #fafafb !important; color: #09090b !important; }
-html.dark .text-ink-900 { color: #fafafb !important; }
-html.dark .text-ink-600 { color: #a1a1aa !important; }
-html.dark .text-ink-400 { color: #71717a !important; }
-html.dark .border-line { border-color: #27272a !important; }
-html.dark .bg-line { background-color: #27272a !important; }
+html.dark .bg-white { background-color: #000000 !important; }
+html.dark .bg-surface { background-color: #000000 !important; }
+html.dark .bg-ink-900 { background-color: #f1f1f3 !important; color: #09090b !important; }
+html.dark .text-ink-900 { color: #f1f1f3 !important; }
+html.dark .text-ink-600 { color: #a8a8b0 !important; }
+html.dark .text-ink-400 { color: #94949e !important; }
+html.dark .border-line { border-color: #2e2e32 !important; }
+html.dark .bg-line { background-color: #2e2e32 !important; }
 
 ::selection {
-  background: #ede9fe;
+  background: #111113;
+  color: #fff;
+}
+::-moz-selection {
+  background: #111113;
+  color: #fff;
+}
+html.dark ::selection {
+  background: #f1f1f3;
+  color: #09090b;
+}
+html.dark ::-moz-selection {
+  background: #f1f1f3;
+  color: #09090b;
 }
 
 /* Very subtle color emanations — every interactive color shift breathes */
@@ -71,10 +81,13 @@ a svg, button svg {
   transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Subtle focus */
+/* Subtle focus — monochrome */
 :focus-visible {
-  outline: 2px solid #6d5aff;
+  outline: 2px solid #27272a;
   outline-offset: 2px;
+}
+html.dark :focus-visible {
+  outline-color: #3f3f46;
 }
 
 /* Hairline divider */
@@ -128,6 +141,17 @@ a svg, button svg {
     box-shadow 180ms cubic-bezier(0.16, 1, 0.3, 1),
     background 180ms ease;
 }
+html.dark .metallic-dark {
+  background: #f1f1f3;
+  border-color: #e4e4e7;
+  color: #09090b;
+  box-shadow: none;
+}
+html.dark .metallic-dark:hover {
+  background: #f8f8f9;
+  box-shadow: none;
+  transform: translateY(-1px);
+}
 
 .metallic-dark:hover {
   background: linear-gradient(180deg, #323236 0%, #1e1e22 45%, #151519 100%);
@@ -171,6 +195,11 @@ a svg, button svg {
     0 12px 32px rgba(17, 17, 19, 0.07),
     0 2px 8px rgba(17, 17, 19, 0.05);
 }
+html.dark .metallic-card:hover {
+  border-color: #3f3f46;
+  box-shadow: none;
+  background: #1e1e22;
+}
 
 .metallic-pill {
   background: #ffffff;
@@ -205,6 +234,16 @@ a svg, button svg {
     0 8px 20px rgba(17, 17, 19, 0.07),
     0 2px 6px rgba(17, 17, 19, 0.05);
 }
+html.dark .metallic-pill:hover {
+  border-color: #3f3f46;
+  background: #1e1e22;
+  box-shadow: none;
+}
+html.dark .metallic-secondary:hover {
+  border-color: #3f3f46;
+  background: #1e1e22;
+  box-shadow: none;
+}
 
 /* Hero cloud — enlarged, saturated blobs only */
 @keyframes hero-drift {
@@ -236,10 +275,51 @@ a svg, button svg {
   .hero-light, .hero-glow, .hero-glow-2 { animation: none !important; }
 }
 html.dark .hero-light {
-  opacity: 0.55 !important;
+  opacity: 0.38 !important;
 }
 html.dark .hero-glow {
-  opacity: 0.9 !important;
+  opacity: 0.65 !important;
+}
+
+/* Hero highlight — marker wipe, works in both modes */
+@keyframes hero-highlight-in {
+  0% { transform: scaleX(0); }
+  100% { transform: scaleX(1); }
+}
+.hero-highlight {
+  position: relative;
+  display: inline-block;
+  z-index: 0;
+}
+.hero-highlight::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: #27272a; /* zinc-800 */
+  z-index: -1;
+  transform-origin: left;
+  transform: scaleX(0);
+  animation: hero-highlight-in 0.85s cubic-bezier(0.16, 1, 0.3, 1) 0.35s forwards;
+}
+html.dark .hero-highlight::before {
+  background: #f1f1f3; /* softer white — matches dark white */
+}
+.hero-highlight > span {
+  position: relative;
+  display: inline-block;
+  color: #fff;
+  opacity: 0;
+  animation: hero-highlight-text 0.35s ease 0.9s forwards;
+}
+html.dark .hero-highlight > span {
+  color: #09090b;
+}
+@keyframes hero-highlight-text {
+  to { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-highlight::before { animation: none !important; transform: scaleX(1) !important; }
+  .hero-highlight > span { animation: none !important; opacity: 1 !important; }
 }
 
 /* Smooth scrolling for reduced-motion users */

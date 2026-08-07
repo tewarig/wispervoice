@@ -312,7 +312,7 @@ function Hero() {
             href="#features"
             className="metallic-pill group inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-[12px] font-medium text-ink-600 transition-all duration-200 hover:border-ink-200"
           >
-            <span className="h-1.5 w-1.5 rounded-full bg-violet-600" />
+            <span className="h-1.5 w-1.5 rounded-full bg-ink-900" />
             Free & open source — local Whisper, offline
             <ArrowRight className="h-3 w-3 text-ink-400 transition-transform duration-200 group-hover:translate-x-0.5" strokeWidth={1.8} />
           </a>
@@ -320,15 +320,16 @@ function Hero() {
 
         <div className="mx-auto mt-8 max-w-[720px] text-center">
           <Reveal delay={60}>
-            <h1 className="relative text-[40px] font-[750] leading-[0.92] tracking-[-0.04em] text-ink-900 sm:text-[58px] lg:text-[64px]">
-              <span className="hero-glow pointer-events-none absolute left-1/2 top-1/2 -z-10 h-[150%] w-[132%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-gradient-to-r from-violet-200/70 via-violet-100/50 to-violet-200/70 blur-[36px]" />
+            <h1 className="relative isolate text-[40px] font-[750] leading-[0.92] tracking-[-0.04em] text-ink-900 sm:text-[58px] lg:text-[64px]">
               Dictate at the
               <br />
-              <span className="bg-gradient-to-r from-violet-600 via-violet-500 to-violet-600 bg-clip-text text-transparent">speed of thought.</span>
+              <span className="hero-highlight px-3 py-1 leading-[1.05] sm:px-4 sm:py-1.5">
+                <span>speed of thought.</span>
+              </span>
             </h1>
           </Reveal>
           <Reveal delay={120}>
-            <p className="mx-auto mt-5 max-w-[560px] text-[16px] leading-7 text-ink-600 sm:text-[17px]">
+            <p className="mx-auto mt-5 max-w-[560px] text-[16px] leading-7 text-ink-700 sm:text-[17px]">
               Native Mac dictation that works in <span className="font-medium text-ink-900">every app</span>. Hold{" "}
               <span className="metallic-pill rounded-md px-1.5 py-0.5 font-mono text-xs font-medium text-ink-600">⌥ Space</span> or double-tap{" "}
               <span className="metallic-pill rounded-md px-1.5 py-0.5 font-mono text-xs font-medium text-ink-600">Fn</span>, speak naturally, and watch
@@ -345,7 +346,7 @@ function Hero() {
               >
                 <AppleIcon className="h-[15px] w-[13px] transition-transform duration-200 group-hover:scale-105" />
                 Download for Mac
-                <span className="ml-0.5 text-xs font-normal text-white/60">· Free</span>
+                <span className="ml-0.5 text-xs font-normal text-white/60 dark:text-ink-900/55">· Free</span>
               </a>
               <a
                 href="https://github.com/tewarig/wispervoice"
@@ -362,7 +363,7 @@ function Hero() {
           <Reveal delay={220}>
             <div className="mt-4 flex flex-wrap items-center justify-center gap-2 text-xs text-ink-400 sm:gap-3">
               <span className="inline-flex items-center gap-1.5">
-                <span className="h-1.5 w-1.5 animate-pulseDot rounded-full bg-violet-600" />
+                <span className="h-1.5 w-1.5 animate-pulseDot rounded-full bg-ink-900" />
                 macOS 14+ · Apple Silicon & Intel
               </span>
               <span className="hidden h-3 w-px bg-line sm:block" />
@@ -376,18 +377,18 @@ function Hero() {
         <Reveal delay={260} className="mx-auto mt-10 max-w-[860px] sm:mt-14">
           <div className="relative">
             <div className="metallic-glass absolute left-1/2 top-0 z-10 hidden -translate-x-1/2 -translate-y-1/2 items-center gap-3 rounded-full px-4 py-2.5 sm:flex">
-              <span className="grid h-7 w-7 place-items-center rounded-full bg-violet-600 text-white">
+              <span className="grid h-7 w-7 place-items-center rounded-full bg-ink-900 text-white">
                 <AudioLines className="h-3.5 w-3.5" strokeWidth={1.9} />
               </span>
               <span className="flex items-center gap-1.5 text-[11px] font-semibold tracking-wide text-ink-900">
-                <span className="h-1.5 w-1.5 animate-pulseDot rounded-full bg-violet-600" /> RECORDING
+                <span className="h-1.5 w-1.5 animate-pulseDot rounded-full bg-ink-900" /> RECORDING
               </span>
               <span className="flex items-end gap-[2px]">
                 {[7, 14, 10, 18, 9, 13].map((h, i) => (
                   <span key={i} className="w-[3px] rounded-full bg-ink-900" style={{ height: h, opacity: 0.9 - i * 0.07 }} />
                 ))}
               </span>
-              <span className="max-w-[260px] truncate text-xs text-ink-600">“Write a follow-up to Sarah about the Q3 roadmap…”</span>
+              <span className="max-w-[260px] truncate text-xs text-ink-600">“Write a follow-up to Gaurav about the Q3 roadmap…”</span>
             </div>
 
             <div className="metallic-card overflow-hidden rounded-[20px] transition-shadow duration-300 hover:shadow-pill sm:rounded-[24px]">
@@ -397,7 +398,7 @@ function Hero() {
                 <span className="h-3 w-3 rounded-full border border-line bg-white" />
                 <span className="ml-3 hidden text-xs font-medium text-ink-400 sm:inline">Slack · #product — WisperVoice will paste here</span>
                 <span className="metallic-pill ml-auto inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium text-ink-600">
-                  <span className="h-1.5 w-1.5 rounded-full bg-violet-600" /> Listening
+                  <span className="h-1.5 w-1.5 rounded-full bg-ink-900" /> Listening
                 </span>
               </div>
 
@@ -408,13 +409,13 @@ function Hero() {
                       <Command className="h-3 w-3" strokeWidth={1.8} />
                     </span>
                     SLACK · #product
-                    <span className="metallic-pill ml-auto inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium text-violet-600">
-                      <span className="h-1.5 w-1.5 rounded-full bg-violet-600" /> Inserted ✓
+                    <span className="metallic-pill ml-auto inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium text-ink-900">
+                      <span className="h-1.5 w-1.5 rounded-full bg-ink-900" /> Inserted ✓
                     </span>
                   </div>
                   <p className="mt-3 text-[14.5px] leading-6 text-ink-900">
-                    Hey Sarah — quick follow-up on the Q3 roadmap. We&apos;ve aligned on the new onboarding flow and{" "}
-                    <span className="rounded bg-violet-50 px-1 py-0.5 transition-colors duration-200">decided to ship the AI polish feature first</span>. Let me know if you
+                    Hey Gaurav — quick follow-up on the Q3 roadmap. We&apos;ve aligned on the new onboarding flow and{" "}
+                    <span className="rounded bg-zinc-800 px-1 py-0.5 text-sm text-white dark:bg-zinc-100 dark:text-ink-900">decided to ship the AI polish feature first</span>. Let me know if you
                     want to sync tomorrow around 10am.
                   </p>
                   <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-ink-400">
@@ -470,7 +471,7 @@ function Features() {
                   <Zap className="h-5 w-5" strokeWidth={1.7} />
                 </IconBadge>
                 <span className="metallic-pill hidden items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-medium text-ink-600 sm:inline-flex">
-                  <span className="h-1.5 w-1.5 rounded-full bg-violet-600" />
+                  <span className="h-1.5 w-1.5 rounded-full bg-ink-900" />
                   Paste at cursor
                 </span>
               </div>
@@ -581,7 +582,7 @@ function Features() {
                 <span className="px-1 py-1 text-[11px] text-ink-400">+96</span>
               </div>
               <div className="mt-4 inline-flex items-center gap-1.5 text-xs text-ink-400">
-                <span className="h-1.5 w-1.5 rounded-full bg-violet-600" />
+                <span className="h-1.5 w-1.5 rounded-full bg-ink-900" />
                 Apple + Whisper — same transcript
               </div>
             </div>
@@ -681,7 +682,7 @@ function Demo() {
         <Reveal className="mx-auto max-w-[640px] text-center">
           <Kicker>
             <span className="flex items-center gap-2">
-              <span className="h-1.5 w-1.5 animate-pulseDot rounded-full bg-violet-600" /> LIVE DEMO
+              <span className="h-1.5 w-1.5 animate-pulseDot rounded-full bg-ink-900" /> LIVE DEMO
             </span>
           </Kicker>
           <h2 className="mt-3 text-[28px] font-bold tracking-[-0.03em] text-ink-900 sm:text-[34px]">See the pill. Hear the speed.</h2>
@@ -706,14 +707,14 @@ function Demo() {
                     </span>
                   </div>
                   <span className="metallic-pill absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-medium text-ink-600">
-                    <span className="h-1.5 w-1.5 rounded-full bg-violet-600" /> Transcribed in 0.6s · Pasted ✓
+                    <span className="h-1.5 w-1.5 rounded-full bg-ink-900" /> Transcribed in 0.6s · Pasted ✓
                   </span>
                 </button>
               ) : (
                 <div className="absolute inset-0 grid place-items-center p-6">
                   <div className="metallic-card w-full max-w-[460px] rounded-2xl p-5">
                     <div className="flex items-center gap-2 text-xs font-medium text-ink-600">
-                      <span className="h-1.5 w-1.5 animate-pulseDot rounded-full bg-violet-600" /> Now playing — press ⌥ Space to try for real
+                      <span className="h-1.5 w-1.5 animate-pulseDot rounded-full bg-ink-900" /> Now playing — press ⌥ Space to try for real
                     </div>
                     <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-ink-100">
                       <div className="h-full w-[62%] rounded-full bg-ink-900" />
@@ -759,7 +760,7 @@ function FAQ() {
           <h2 className="mt-3 text-[26px] font-bold tracking-[-0.03em] text-ink-900 sm:text-[30px]">Questions, answered.</h2>
           <p className="mt-2 text-sm text-ink-600">
             Can&apos;t find what you need?{" "}
-            <a href="mailto:hello@wispervoice.ai" className="font-medium text-ink-900 underline decoration-line underline-offset-4 transition-colors duration-200 hover:decoration-ink-300">
+            <a href="mailto:hello@wispervoice.ai" className="font-medium text-ink-900 underline decoration-line underline-offset-4 transition-colors duration-200 hover:decoration-ink-300 dark:hover:decoration-white/20">
               hello@wispervoice.ai
             </a>
           </p>
@@ -767,10 +768,10 @@ function FAQ() {
 
         <Reveal delay={100} className="metallic-card mt-8 divide-y divide-line overflow-hidden rounded-[16px]">
           {FAQS.map((f, i) => (
-            <div key={f.q} className={open === i ? "bg-white" : ""}>
+            <div key={f.q} className={open === i ? "bg-white dark:bg-[#1e1e22]" : "dark:bg-transparent"}>
               <button
                 onClick={() => setOpen(open === i ? -1 : i)}
-                className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left transition-colors duration-200 hover:bg-surface/60"
+                className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left transition-colors duration-200 hover:bg-ink-900/[0.04] dark:hover:bg-white/[0.06]"
               >
                 <span className="text-[14px] font-medium text-ink-900">{f.q}</span>
                 <span
@@ -896,9 +897,19 @@ function Footer() {
 
         <div className="mt-10 flex flex-col items-center justify-between gap-3 border-t border-line pt-6 text-xs text-ink-400 sm:flex-row">
           <span>© {new Date().getFullYear()} WisperVoice · MIT · Not affiliated with Wispr AI</span>
-          <span className="inline-flex items-center gap-2">
-            <span className="h-1.5 w-1.5 rounded-full bg-violet-600" /> All systems operational
-          </span>
+          <div className="flex items-center gap-4">
+            <span className="inline-flex items-center gap-2">
+              <span className="h-1.5 w-1.5 rounded-full bg-ink-900" /> All systems operational
+            </span>
+            <ThemeSwitcher />
+          </div>
+        </div>
+        <div className="mt-6 text-center text-xs text-ink-400">
+          Crafted with <span className="text-ink-900">♥</span> for{" "}
+          <a href="https://wisprflow.ai" target="_blank" rel="noreferrer" className="font-medium text-ink-900 underline decoration-line underline-offset-4 hover:decoration-ink-300">
+            Wispr Flow
+          </a>{" "}
+          — inspired, not affiliated.
         </div>
       </div>
     </footer>
@@ -906,11 +917,13 @@ function Footer() {
 }
 
 function ThemeSwitcher() {
-  const [theme, setTheme] = useState("system");
-  useEffect(() => {
-    const saved = localStorage.getItem("theme");
-    if (saved === "light" || saved === "dark" || saved === "system") setTheme(saved);
-  }, []);
+  const [theme, setTheme] = useState(() => {
+    try {
+      const saved = localStorage.getItem("theme");
+      if (saved === "light" || saved === "dark" || saved === "system") return saved;
+    } catch {}
+    return "system";
+  });
   useEffect(() => {
     const root = document.documentElement;
     const media = window.matchMedia("(prefers-color-scheme: dark)");
@@ -919,7 +932,9 @@ function ThemeSwitcher() {
       root.classList.toggle("dark", isDark);
     };
     apply(theme);
-    localStorage.setItem("theme", theme);
+    try {
+      localStorage.setItem("theme", theme);
+    } catch {}
     if (theme === "system") {
       const handler = () => apply("system");
       media.addEventListener("change", handler);
@@ -934,7 +949,7 @@ function ThemeSwitcher() {
   ];
 
   return (
-    <div className="fixed bottom-5 left-1/2 z-50 flex -translate-x-1/2 items-center gap-1 rounded-full border border-line bg-white/90 p-1 shadow-[0_8px_32px_rgba(0,0,0,0.12)] backdrop-blur-xl dark:border-white/10 dark:bg-ink-900/80">
+    <div className="flex items-center gap-1 rounded-full border border-line bg-white p-1 shadow-[0_1px_3px_rgba(0,0,0,0.06)] dark:border-white/10 dark:bg-ink-900/80">
       {opts.map((o) => {
         const Icon = o.icon;
         const active = theme === o.id;
@@ -974,7 +989,6 @@ export default function App() {
       <Demo />
       <FAQ />
       <Footer />
-      <ThemeSwitcher />
     </div>
   );
 }
