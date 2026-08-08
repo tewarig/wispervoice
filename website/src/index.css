@@ -245,42 +245,6 @@ html.dark .metallic-secondary:hover {
   box-shadow: none;
 }
 
-/* Hero cloud — enlarged, saturated blobs only */
-@keyframes hero-drift {
-  0% { transform: translateX(-50%) translate3d(-4%, 0, 0) scale(1); opacity: 0.92; }
-  50% { transform: translateX(-50%) translate3d(5%, -4%, 0) scale(1.05); opacity: 1; }
-  100% { transform: translateX(-50%) translate3d(-4%, 0, 0) scale(1); opacity: 0.92; }
-}
-@keyframes hero-glow {
-  0%, 100% { opacity: 0.75; transform: translateX(-50%) scale(1); }
-  50% { opacity: 1; transform: translateX(-50%) scale(1.08); }
-}
-@keyframes hero-glow-2 {
-  0%, 100% { opacity: 0.5; transform: translateX(-50%) translateY(0) scale(1); }
-  50% { opacity: 0.85; transform: translateX(-48%) translateY(-8px) scale(1.06); }
-}
-.hero-light {
-  animation: hero-drift 16s ease-in-out infinite;
-  will-change: transform, opacity;
-}
-.hero-glow {
-  animation: hero-glow 12s ease-in-out infinite;
-  will-change: transform, opacity;
-}
-.hero-glow-2 {
-  animation: hero-glow-2 14s ease-in-out infinite;
-  will-change: transform, opacity;
-}
-@media (prefers-reduced-motion: reduce) {
-  .hero-light, .hero-glow, .hero-glow-2 { animation: none !important; }
-}
-html.dark .hero-light {
-  opacity: 0.38 !important;
-}
-html.dark .hero-glow {
-  opacity: 0.65 !important;
-}
-
 /* Hero highlight — marker wipe, works in both modes */
 @keyframes hero-highlight-in {
   0% { transform: scaleX(0); }

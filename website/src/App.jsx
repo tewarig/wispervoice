@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import {
   Mic,
-  Check,
   ArrowRight,
   Menu,
   X,
@@ -16,6 +15,9 @@ import {
   Sun,
   Moon,
   Monitor,
+  Tag,
+  Download,
+  ExternalLink,
 } from "lucide-react";
 
 function GithubIcon({ className = "", ...props }) {
@@ -79,6 +81,7 @@ const NAV_LINKS = [
   { label: "How it works", href: "#how" },
   { label: "Demo", href: "#demo" },
   { label: "FAQ", href: "#faq" },
+  { label: "Releases", href: "#/releases" },
 ];
 const APPS = ["Notion", "Slack", "Xcode", "Gmail", "Figma"];
 const LANGS = ["EN", "HI", "ES", "JA", "FR", "DE"];
@@ -107,6 +110,9 @@ function GitHubStars({ stars, status }) {
 // ─── Nav ───
 const GITHUB_REPO = "tewarig/wispervoice";
 const GITHUB_API = `https://api.github.com/repos/${GITHUB_REPO}`;
+// Single source for repo links — a rename/transfer edits GITHUB_REPO only.
+const GITHUB_URL = `https://github.com/${GITHUB_REPO}`;
+const RELEASES_URL = `${GITHUB_URL}/releases`;
 const GH_CACHE_KEY = "wv_gh_stars";
 const GH_CACHE_TS_KEY = "wv_gh_stars_ts";
 const GH_CACHE_TTL = 1000 * 60 * 60 * 6; // 6 hours
@@ -238,7 +244,7 @@ function Nav() {
 
           <div className="hidden items-center gap-3 md:flex">
             <a
-              href="https://github.com/tewarig/wispervoice"
+              href={GITHUB_URL}
               target="_blank"
               rel="noreferrer"
               aria-label={`GitHub — ${formatStars(stars)} stars`}
@@ -275,7 +281,7 @@ function Nav() {
                 </a>
               ))}
               <a
-                href="https://github.com/tewarig/wispervoice"
+                href={GITHUB_URL}
                 target="_blank"
                 rel="noreferrer"
                 onClick={() => setOpen(false)}
@@ -288,7 +294,9 @@ function Nav() {
                 <GitHubStars stars={stars} status={starsStatus} />
               </a>
               <a
-                href="#download"
+                href={RELEASES_URL}
+                target="_blank"
+                rel="noreferrer"
                 onClick={() => setOpen(false)}
                 className="metallic-dark inline-flex items-center justify-center gap-2 rounded-full px-4 py-3 text-sm font-semibold text-white"
               >
@@ -330,7 +338,7 @@ function Hero() {
           </Reveal>
           <Reveal delay={120}>
             <p className="mx-auto mt-5 max-w-[560px] text-[16px] leading-7 text-ink-700 sm:text-[17px]">
-              Native Mac dictation that works in <span className="font-medium text-ink-900">every app</span>. Hold{" "}
+              Native Mac dictation that works in <span className="font-medium text-ink-900">every app</span>. Press{" "}
               <span className="metallic-pill rounded-md px-1.5 py-0.5 font-mono text-xs font-medium text-ink-600">⌥ Space</span> or double-tap{" "}
               <span className="metallic-pill rounded-md px-1.5 py-0.5 font-mono text-xs font-medium text-ink-600">Fn</span>, speak naturally, and watch
               polished text appear at your cursor.
@@ -340,8 +348,9 @@ function Hero() {
           <Reveal delay={180}>
             <div id="download" className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <a
-                href="#"
-                onClick={(e) => e.preventDefault()}
+                href={RELEASES_URL}
+                target="_blank"
+                rel="noreferrer"
                 className="metallic-dark group inline-flex w-full items-center justify-center gap-2.5 rounded-full px-8 py-[14px] text-[15px] font-semibold text-white sm:w-auto"
               >
                 <AppleIcon className="h-[15px] w-[13px] transition-transform duration-200 group-hover:scale-105" />
@@ -349,7 +358,7 @@ function Hero() {
                 <span className="ml-0.5 text-xs font-normal text-white/60 dark:text-ink-900/55">· Free</span>
               </a>
               <a
-                href="https://github.com/tewarig/wispervoice"
+                href={GITHUB_URL}
                 target="_blank"
                 rel="noreferrer"
                 className="metallic-secondary group inline-flex w-full items-center justify-center gap-2 rounded-full px-7 py-3.5 text-[14.5px] font-semibold text-ink-900 sm:w-auto"
@@ -427,7 +436,7 @@ function Hero() {
 
                 <div className="mt-4 grid grid-cols-3 gap-2.5">
                   {[
-                    { k: "⌥ Space", v: "Hold to talk" },
+                    { k: "⌥ Space", v: "Press to talk" },
                     { k: "Fn ×2", v: "Double-tap" },
                     { k: "Auto", v: "Paste at cursor" },
                   ].map((x) => (
@@ -596,7 +605,7 @@ function Features() {
 // ─── How it works ───
 function HowItWorks() {
   const steps = [
-    { n: "01", title: "Hold. Speak.", desc: "Press ⌥ Space or double-tap Fn anywhere. The pill appears above all spaces — bottom-center, glass, instant.", mono: "NSWindow .floating" },
+    { n: "01", title: "Press. Speak.", desc: "Press ⌥ Space or double-tap Fn anywhere. The pill appears above all spaces — bottom-center, glass, instant.", mono: "NSWindow .floating" },
     { n: "02", title: "We clean it.", desc: "Filler words cut, punctuation fixed, Hinglish kept. Optional gpt-4o-mini polish in a blink.", mono: "polish() · 300ms" },
     { n: "03", title: "Pasted.", desc: "Text lands at your cursor via AX. If blocked, we fall back to clipboard + synthetic ⌘V.", mono: "AXSelectedText → ⌘V" },
   ];
@@ -663,7 +672,7 @@ function HowItWorks() {
           <div className="mt-6 flex items-center gap-3 sm:mt-7">
             <div className="h-px flex-1 bg-line" />
             <span className="font-mono text-[10.5px] tracking-[0.12em] text-ink-400">
-              HOLD &nbsp;·&nbsp; POLISH &nbsp;·&nbsp; PASTE
+              PRESS &nbsp;·&nbsp; POLISH &nbsp;·&nbsp; PASTE
             </span>
             <div className="h-px flex-1 bg-line" />
           </div>
@@ -691,7 +700,8 @@ function Demo() {
 
         <Reveal delay={120} className="mx-auto mt-8 max-w-[760px]">
           <div className="metallic-card overflow-hidden rounded-[20px] p-2 transition-shadow duration-300 hover:shadow-pill">
-            <div className="relative aspect-[16/10] overflow-hidden rounded-[14px] bg-ink-900">
+            {/* bg-[#111113], not bg-ink-900 — the dark-mode CSS flips .bg-ink-900 to near-white, which made the white captions invisible */}
+            <div className="relative aspect-[16/10] overflow-hidden rounded-[14px] bg-[#111113]">
               {!playing ? (
                 <button onClick={() => setPlaying(true)} className="group absolute inset-0 grid place-items-center" aria-label="Play demo">
                   <div className="absolute inset-0 opacity-40" style={{ background: "radial-gradient(500px 280px at 50% 0%, #7c5cfc 0%, transparent 70%)" }} />
@@ -716,7 +726,7 @@ function Demo() {
                     <div className="flex items-center gap-2 text-xs font-medium text-ink-600">
                       <span className="h-1.5 w-1.5 animate-pulseDot rounded-full bg-ink-900" /> Now playing — press ⌥ Space to try for real
                     </div>
-                    <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-ink-100">
+                    <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-ink-100 dark:bg-white/10">
                       <div className="h-full w-[62%] rounded-full bg-ink-900" />
                     </div>
                     <p className="mt-3 text-sm leading-6 text-ink-900">“Hey team — let’s move the design review to Thursday. I’ll share the updated specs in Notion right after this.”</p>
@@ -732,9 +742,6 @@ function Demo() {
               <span className="hidden sm:inline">No audio stored</span>
             </div>
           </div>
-          <p className="mt-3 text-center text-xs text-ink-400">
-            Replace with your recording at <code className="metallic-pill rounded px-1 py-0.5 font-mono text-ink-600">/public/demo.mp4</code>
-          </p>
         </Reveal>
       </div>
     </section>
@@ -747,7 +754,7 @@ const FAQS = [
   { q: "Do I need an OpenAI API key?", a: "No. Apple Speech is free and on-device for 100+ languages. Add an OpenAI key in Settings → General to enable Whisper and gpt-4o-mini polish. Local ggml models also work offline with no key." },
   { q: "Is my voice sent to the cloud?", a: "Apple Speech can run on-device. Whisper calls go to OpenAI only if you enable that provider and supply a key — audio is sent directly to OpenAI, not through our servers. We store no audio." },
   { q: "How is this different from Wispr Flow?", a: "WisperVoice is an open-source Mac-native clone inspired by Wispr Flow. Same hotkey + pill + paste flow, but free, open-source, and with local offline models. Not affiliated with Wispr AI." },
-  { q: "What are the requirements?", a: "macOS 14 Sonoma or later, Apple Silicon or Intel. Microphone + Accessibility permissions required. No Dock icon — it lives in the menu bar." },
+  { q: "What are the requirements?", a: "macOS 14 Sonoma or later, Apple Silicon or Intel. Microphone + Accessibility permissions required. Lives in your menu bar, with a full app window when you want it." },
 ];
 
 function FAQ() {
@@ -768,7 +775,8 @@ function FAQ() {
 
         <Reveal delay={100} className="metallic-card mt-8 divide-y divide-line overflow-hidden rounded-[16px]">
           {FAQS.map((f, i) => (
-            <div key={f.q} className={open === i ? "bg-white dark:bg-[#1e1e22]" : "dark:bg-transparent"}>
+            // bg-paper, not bg-white — dark-mode CSS forces .bg-white to #000 !important, defeating the elevated dark:bg
+            <div key={f.q} className={open === i ? "bg-paper dark:bg-[#1e1e22]" : ""}>
               <button
                 onClick={() => setOpen(open === i ? -1 : i)}
                 className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left transition-colors duration-200 hover:bg-ink-900/[0.04] dark:hover:bg-white/[0.06]"
@@ -798,6 +806,303 @@ function FAQ() {
 }
 
 // ─── Footer ───
+// ─── Releases — #/releases route, live from the GitHub Releases API ───
+const GH_RELEASES_CACHE_KEY = "wv_gh_releases";
+const GH_RELEASES_TS_KEY = "wv_gh_releases_ts";
+const GH_RELEASES_TTL = 1000 * 60 * 15; // 15 minutes
+
+function formatBytes(n) {
+  if (typeof n !== "number" || Number.isNaN(n)) return "";
+  if (n >= 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+  return `${Math.max(1, Math.round(n / 1024))} KB`;
+}
+
+function formatDate(iso) {
+  try {
+    return new Date(iso).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+  } catch {
+    return "";
+  }
+}
+
+// Inline markdown: `code` and **bold** — the subset our generated notes use.
+function renderInline(text, keyPrefix) {
+  return text.split(/(`[^`]+`|\*\*[^*]+\*\*)/g).map((part, i) => {
+    if (part.startsWith("`") && part.endsWith("`")) {
+      return (
+        <code key={`${keyPrefix}-${i}`} className="rounded bg-surface px-1.5 py-0.5 font-mono text-[12px] text-ink-900">
+          {part.slice(1, -1)}
+        </code>
+      );
+    }
+    if (part.startsWith("**") && part.endsWith("**")) {
+      return (
+        <strong key={`${keyPrefix}-${i}`} className="font-semibold text-ink-900">
+          {part.slice(2, -2)}
+        </strong>
+      );
+    }
+    return part;
+  });
+}
+
+// Block markdown for release bodies: ###/## headings, - bullets, ``` fences, paragraphs.
+// Deliberately tiny instead of a markdown dependency — we render our own notes format.
+function ReleaseBody({ markdown }) {
+  const blocks = [];
+  const lines = (markdown || "").replace(/\r\n/g, "\n").split("\n");
+  let i = 0;
+  let key = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    if (line.startsWith("```")) {
+      const code = [];
+      i++;
+      while (i < lines.length && !lines[i].startsWith("```")) code.push(lines[i++]);
+      i++; // closing fence
+      blocks.push(
+        <pre key={key++} className="overflow-x-auto rounded-xl bg-ink-950 p-4 font-mono text-[12px] leading-5 text-white/85">
+          {code.join("\n")}
+        </pre>
+      );
+    } else if (line.startsWith("## ")) {
+      // The card header already shows the version — skip the duplicate title heading.
+      const text = line.slice(3);
+      if (!/^WisperVoice/i.test(text)) {
+        blocks.push(
+          <h3 key={key++} className="text-[15px] font-semibold tracking-tight text-ink-900">
+            {renderInline(text, `h-${key}`)}
+          </h3>
+        );
+      }
+      i++;
+    } else if (line.startsWith("### ")) {
+      blocks.push(
+        <h4 key={key++} className="text-[13px] font-semibold tracking-wide text-ink-900">
+          {renderInline(line.slice(4), `h-${key}`)}
+        </h4>
+      );
+      i++;
+    } else if (line.startsWith("- ")) {
+      const items = [];
+      while (i < lines.length && lines[i].startsWith("- ")) {
+        // Fold indented continuation lines into the same bullet.
+        let item = lines[i].slice(2);
+        i++;
+        while (i < lines.length && /^\s{2,}\S/.test(lines[i]) && !lines[i].trim().startsWith("- ")) {
+          item += " " + lines[i].trim();
+          i++;
+        }
+        items.push(item);
+      }
+      blocks.push(
+        <ul key={key++} className="space-y-1.5">
+          {items.map((item, j) => (
+            <li key={j} className="flex gap-2.5 text-[13.5px] leading-6 text-ink-600">
+              <span className="mt-[10px] h-1 w-1 shrink-0 rounded-full bg-ink-400" />
+              <span>{renderInline(item, `li-${key}-${j}`)}</span>
+            </li>
+          ))}
+        </ul>
+      );
+    } else if (line.trim() === "") {
+      i++;
+    } else {
+      blocks.push(
+        <p key={key++} className="text-[13.5px] leading-6 text-ink-600">
+          {renderInline(line, `p-${key}`)}
+        </p>
+      );
+      i++;
+    }
+  }
+  return <div className="space-y-3">{blocks}</div>;
+}
+
+function ReleaseCard({ release, latest, delay }) {
+  const zipAssets = (release.assets || []).filter((a) => /\.(zip|dmg)$/i.test(a.name));
+  return (
+    <Reveal delay={delay}>
+      <Card hover={false} className="p-6 sm:p-8">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <span className="metallic-dark inline-flex items-center gap-1.5 rounded-full px-3 py-1 font-mono text-xs font-semibold text-white">
+            <Tag className="h-3 w-3" strokeWidth={1.9} /> {release.tag_name}
+          </span>
+          {latest && (
+            <span className="metallic-pill rounded-full px-2.5 py-1 text-[10px] font-semibold tracking-widest text-ink-600">LATEST</span>
+          )}
+          {release.prerelease && (
+            <span className="metallic-pill rounded-full px-2.5 py-1 text-[10px] font-semibold tracking-widest text-ink-400">PRE-RELEASE</span>
+          )}
+          <span className="ml-auto text-xs text-ink-400">{formatDate(release.published_at)}</span>
+        </div>
+
+        <div className="mt-5">
+          <ReleaseBody markdown={release.body} />
+        </div>
+
+        {(zipAssets.length > 0 || release.html_url) && (
+          <div className="mt-6 flex flex-wrap items-center gap-2 border-t border-line pt-5">
+            {zipAssets.map((a) => (
+              <a
+                key={a.name}
+                href={a.browser_download_url}
+                className="metallic-secondary inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold text-ink-900"
+              >
+                <Download className="h-3.5 w-3.5" strokeWidth={1.8} />
+                {a.name.endsWith(".dmg") ? "DMG" : "ZIP"}
+                <span className="font-normal text-ink-400">
+                  {formatBytes(a.size)}
+                  {a.download_count > 0 ? ` · ${a.download_count}↓` : ""}
+                </span>
+              </a>
+            ))}
+            <a
+              href={release.html_url}
+              target="_blank"
+              rel="noreferrer"
+              className="ml-auto inline-flex items-center gap-1 text-xs font-medium text-ink-400 transition-colors duration-200 hover:text-ink-900"
+            >
+              View on GitHub <ExternalLink className="h-3 w-3" strokeWidth={1.8} />
+            </a>
+          </div>
+        )}
+      </Card>
+    </Reveal>
+  );
+}
+
+function ReleasesPage() {
+  const [releases, setReleases] = useState(null); // null = loading
+  const [status, setStatus] = useState("loading"); // loading | ready | error
+
+  useEffect(() => {
+    let cancelled = false;
+    const controller = new AbortController();
+
+    // Same cache discipline as the star count: fresh cache skips the network,
+    // stale cache is still shown on API failure.
+    try {
+      const c = localStorage.getItem(GH_RELEASES_CACHE_KEY);
+      const ts = localStorage.getItem(GH_RELEASES_TS_KEY);
+      if (c !== null && ts !== null) {
+        const parsed = JSON.parse(c);
+        const age = Date.now() - parseInt(ts, 10);
+        if (Array.isArray(parsed) && !Number.isNaN(age) && age < GH_RELEASES_TTL) {
+          setReleases(parsed);
+          setStatus("ready");
+          return;
+        }
+      }
+    } catch {}
+
+    fetch(`${GITHUB_API}/releases?per_page=20`, {
+      headers: { Accept: "application/vnd.github+json" },
+      signal: controller.signal,
+    })
+      .then((r) => {
+        if (!r.ok) throw new Error(`GitHub API ${r.status}`);
+        return r.json();
+      })
+      .then((d) => {
+        if (cancelled || !Array.isArray(d)) throw new Error("invalid payload");
+        // Keep only the fields we render — the raw payload is large.
+        const slim = d.map((r) => ({
+          id: r.id,
+          tag_name: r.tag_name,
+          name: r.name,
+          body: r.body,
+          published_at: r.published_at,
+          prerelease: r.prerelease,
+          html_url: r.html_url,
+          assets: (r.assets || []).map((a) => ({
+            name: a.name,
+            size: a.size,
+            download_count: a.download_count,
+            browser_download_url: a.browser_download_url,
+          })),
+        }));
+        setReleases(slim);
+        setStatus("ready");
+        try {
+          localStorage.setItem(GH_RELEASES_CACHE_KEY, JSON.stringify(slim));
+          localStorage.setItem(GH_RELEASES_TS_KEY, String(Date.now()));
+        } catch {}
+      })
+      .catch((err) => {
+        if (cancelled || err?.name === "AbortError") return;
+        // Fall back to any cached copy, however stale.
+        try {
+          const c = localStorage.getItem(GH_RELEASES_CACHE_KEY);
+          const parsed = c !== null ? JSON.parse(c) : null;
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setReleases(parsed);
+            setStatus("ready");
+            return;
+          }
+        } catch {}
+        setStatus("error");
+      });
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, []);
+
+  return (
+    <main className="relative">
+      <section className="mx-auto max-w-[760px] px-5 pb-16 pt-28 sm:px-6 sm:pb-24 sm:pt-36">
+        <Reveal className="text-center">
+          <Kicker>RELEASES</Kicker>
+          <h1 className="mt-4 text-[32px] font-bold leading-[0.95] tracking-[-0.03em] text-ink-900 sm:text-[40px]">
+            What&apos;s new in WisperVoice
+          </h1>
+          <p className="mx-auto mt-4 max-w-[480px] text-[15px] leading-7 text-ink-600">
+            Every version, straight from GitHub — what changed, what got fixed, and the downloads for each build.
+          </p>
+        </Reveal>
+
+        <div className="mt-12 space-y-6">
+          {status === "loading" && (
+            <Card hover={false} className="p-6 sm:p-8">
+              <div className="space-y-3" aria-busy="true" aria-label="Loading releases">
+                <div className="h-6 w-24 animate-pulse rounded-full bg-ink-100" />
+                <div className="h-4 w-3/4 animate-pulse rounded bg-ink-100" />
+                <div className="h-4 w-2/3 animate-pulse rounded bg-ink-100" />
+                <div className="h-4 w-1/2 animate-pulse rounded bg-ink-100" />
+              </div>
+            </Card>
+          )}
+
+          {status === "error" && (
+            <Card hover={false} className="p-6 text-center sm:p-8">
+              <p className="text-sm text-ink-600">Couldn&apos;t reach GitHub right now.</p>
+              <a
+                href={RELEASES_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="metallic-secondary mt-4 inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold text-ink-900"
+              >
+                View releases on GitHub <ExternalLink className="h-3 w-3" strokeWidth={1.8} />
+              </a>
+            </Card>
+          )}
+
+          {status === "ready" && releases?.length === 0 && (
+            <Card hover={false} className="p-6 text-center sm:p-8">
+              <p className="text-sm text-ink-600">No releases yet — the first one is on its way.</p>
+            </Card>
+          )}
+
+          {status === "ready" &&
+            releases?.map((r, i) => <ReleaseCard key={r.id ?? r.tag_name} release={r} latest={i === 0 && !r.prerelease} delay={Math.min(i * 60, 240)} />)}
+        </div>
+      </section>
+    </main>
+  );
+}
+
 function Footer() {
   return (
     <footer className="bg-white">
@@ -811,17 +1116,18 @@ function Footer() {
               <span className="text-sm font-semibold tracking-tight text-ink-900">WisperVoice</span>
               <span className="metallic-pill rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-widest text-ink-400">BETA</span>
             </a>
-            <p className="mt-3 text-sm leading-6 text-ink-600">Native Mac dictation — hold hotkey, speak, paste. Open-source Wispr Flow for macOS.</p>
+            <p className="mt-3 text-sm leading-6 text-ink-600">Native Mac dictation — press the hotkey, speak, paste. Open-source Wispr Flow for macOS.</p>
             <div className="mt-4 flex gap-2">
               <a
-                href="#"
-                onClick={(e) => e.preventDefault()}
+                href={RELEASES_URL}
+                target="_blank"
+                rel="noreferrer"
                 className="metallic-dark inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold text-white"
               >
                 <AppleIcon className="h-3 w-[10px]" /> Download
               </a>
               <a
-                href="https://github.com/tewarig/wispervoice"
+                href={GITHUB_URL}
                 target="_blank"
                 rel="noreferrer"
                 className="metallic-secondary inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-medium text-ink-600"
@@ -856,17 +1162,17 @@ function Footer() {
               <div className="text-xs font-semibold tracking-wide text-ink-900">Developers</div>
               <ul className="mt-3 space-y-2 text-ink-600">
                 <li>
-                  <a href="https://github.com/tewarig/wispervoice" target="_blank" rel="noreferrer" className="transition-colors duration-200 hover:text-ink-900">
+                  <a href={GITHUB_URL} target="_blank" rel="noreferrer" className="transition-colors duration-200 hover:text-ink-900">
                     GitHub
                   </a>
                 </li>
                 <li>
-                  <a href="#" className="transition-colors duration-200 hover:text-ink-900">
+                  <a href={`${GITHUB_URL}/blob/main/CONTRIBUTING.md`} target="_blank" rel="noreferrer" className="transition-colors duration-200 hover:text-ink-900">
                     Contributing
                   </a>
                 </li>
                 <li>
-                  <a href="#" className="transition-colors duration-200 hover:text-ink-900">
+                  <a href="#/releases" className="transition-colors duration-200 hover:text-ink-900">
                     Releases
                   </a>
                 </li>
@@ -876,13 +1182,8 @@ function Footer() {
               <div className="text-xs font-semibold tracking-wide text-ink-900">Legal</div>
               <ul className="mt-3 space-y-2 text-ink-600">
                 <li>
-                  <a href="#" className="transition-colors duration-200 hover:text-ink-900">
-                    Privacy
-                  </a>
-                </li>
-                <li>
-                  <a href="#" className="transition-colors duration-200 hover:text-ink-900">
-                    Terms
+                  <a href={`${GITHUB_URL}/blob/main/LICENSE`} target="_blank" rel="noreferrer" className="transition-colors duration-200 hover:text-ink-900">
+                    License (MIT)
                   </a>
                 </li>
                 <li>
@@ -975,19 +1276,49 @@ function ThemeSwitcher() {
 }
 
 export default function App() {
+  // Hash-based routing (#/releases) — works on any static host, no server rewrites,
+  // and plain #section anchors on the landing page keep working untouched.
+  const [route, setRoute] = useState(() => window.location.hash);
+  useEffect(() => {
+    const onHash = () => setRoute(window.location.hash);
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
+  const onReleases = route === "#/releases";
+
+  useEffect(() => {
+    if (onReleases) {
+      window.scrollTo(0, 0);
+      return;
+    }
+    // Returning from the releases route to a #section anchor: the landing sections
+    // remount, so scroll after paint once the target exists again.
+    const id = route.startsWith("#") ? route.slice(1) : "";
+    if (id && !id.startsWith("/")) {
+      requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView());
+    }
+  }, [route, onReleases]);
+
+  // No background on this wrapper — an opaque bg would paint over the -z-10 blob; body provides the page bg
   return (
-    <div className="min-h-screen bg-white antialiased">
+    <div className="min-h-screen antialiased">
       {/* Center blob — fixed to viewport center, stays in place while scrolling */}
       <div
         className="pointer-events-none fixed left-1/2 top-1/2 -z-10 h-[90vh] w-[90vw] -translate-x-1/2 -translate-y-1/2 rounded-full blur-[32px]"
         style={{ background: "radial-gradient(50% 50% at 50% 50%, rgba(91,74,211,0.09) 0%, rgba(124,92,252,0.05) 42%, transparent 70%)", opacity: 0.87 }}
       />
       <Nav />
-      <Hero />
-      <Features />
-      <HowItWorks />
-      <Demo />
-      <FAQ />
+      {onReleases ? (
+        <ReleasesPage />
+      ) : (
+        <>
+          <Hero />
+          <Features />
+          <HowItWorks />
+          <Demo />
+          <FAQ />
+        </>
+      )}
       <Footer />
     </div>
   );
