@@ -224,6 +224,13 @@ jobs:
               echo ""
             fi
             echo "### Install"
+            echo ""
+            echo "**One command (no security warning — Terminal downloads skip quarantine):**"
+            echo '```bash'
+            echo "curl -fsSL https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/main/scripts/install.sh | bash"
+            echo '```'
+            echo ""
+            echo "**Or manually:**"
             echo '```bash'
             echo "# Download and unzip, then move to Applications:"
             echo "unzip WisperVoice-*.zip"

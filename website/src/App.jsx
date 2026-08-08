@@ -117,6 +117,9 @@ const RELEASES_URL = `${GITHUB_URL}/releases`;
 // to every release exactly so this URL always serves the latest build. Clicking any
 // Download button starts the download immediately — no GitHub page in between.
 const DOWNLOAD_URL = `${GITHUB_URL}/releases/latest/download/WisperVoice-macOS.zip`;
+// Terminal install: curl downloads never get macOS's quarantine flag, so this path
+// installs and opens with no Gatekeeper "malware" warning (builds aren't notarized yet).
+const INSTALL_CMD = `curl -fsSL https://raw.githubusercontent.com/${GITHUB_REPO}/main/scripts/install.sh | bash`;
 const GH_CACHE_KEY = "wv_gh_stars";
 const GH_CACHE_TS_KEY = "wv_gh_stars_ts";
 const GH_CACHE_TTL = 1000 * 60 * 60 * 6; // 6 hours
@@ -976,6 +979,24 @@ function ReleaseCard({ release, latest, delay }) {
   );
 }
 
+function CopyCommandButton({ command }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      onClick={() => {
+        try {
+          navigator.clipboard?.writeText(command);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1400);
+        } catch {}
+      }}
+      className="metallic-secondary shrink-0 rounded-full px-4 py-2 text-xs font-semibold text-ink-900"
+    >
+      {copied ? "Copied ✓" : "Copy"}
+    </button>
+  );
+}
+
 function ReleasesPage() {
   const [releases, setReleases] = useState(null); // null = loading
   const [status, setStatus] = useState("loading"); // loading | ready | error
@@ -1067,7 +1088,23 @@ function ReleasesPage() {
           </p>
         </Reveal>
 
-        <div className="mt-12 space-y-6">
+        <Reveal delay={60}>
+          <Card hover={false} className="mt-10 p-5 sm:p-6">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-[13px] font-semibold text-ink-900">Install in one command</div>
+                <p className="mt-1 text-xs leading-5 text-ink-600">
+                  Skips the macOS security warning — Terminal downloads aren&apos;t quarantined. Downloading in a browser instead? Use System Settings → Privacy &amp; Security →{" "}
+                  <span className="font-medium text-ink-900">Open Anyway</span> after the first launch attempt.
+                </p>
+              </div>
+              <CopyCommandButton command={INSTALL_CMD} />
+            </div>
+            <pre className="mt-3 overflow-x-auto rounded-xl bg-ink-950 p-4 font-mono text-[12px] leading-5 text-white/85">{INSTALL_CMD}</pre>
+          </Card>
+        </Reveal>
+
+        <div className="mt-6 space-y-6">
           {status === "loading" && (
             <Card hover={false} className="p-6 sm:p-8">
               <div className="space-y-3" aria-busy="true" aria-label="Loading releases">
