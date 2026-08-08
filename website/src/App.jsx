@@ -113,6 +113,10 @@ const GITHUB_API = `https://api.github.com/repos/${GITHUB_REPO}`;
 // Single source for repo links — a rename/transfer edits GITHUB_REPO only.
 const GITHUB_URL = `https://github.com/${GITHUB_REPO}`;
 const RELEASES_URL = `${GITHUB_URL}/releases`;
+// Stable direct-download link: release.yml uploads a version-less WisperVoice-macOS.zip
+// to every release exactly so this URL always serves the latest build. Clicking any
+// Download button starts the download immediately — no GitHub page in between.
+const DOWNLOAD_URL = `${GITHUB_URL}/releases/latest/download/WisperVoice-macOS.zip`;
 const GH_CACHE_KEY = "wv_gh_stars";
 const GH_CACHE_TS_KEY = "wv_gh_stars_ts";
 const GH_CACHE_TTL = 1000 * 60 * 60 * 6; // 6 hours
@@ -294,9 +298,7 @@ function Nav() {
                 <GitHubStars stars={stars} status={starsStatus} />
               </a>
               <a
-                href={RELEASES_URL}
-                target="_blank"
-                rel="noreferrer"
+                href={DOWNLOAD_URL}
                 onClick={() => setOpen(false)}
                 className="metallic-dark inline-flex items-center justify-center gap-2 rounded-full px-4 py-3 text-sm font-semibold text-white"
               >
@@ -348,9 +350,7 @@ function Hero() {
           <Reveal delay={180}>
             <div id="download" className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <a
-                href={RELEASES_URL}
-                target="_blank"
-                rel="noreferrer"
+                href={DOWNLOAD_URL}
                 className="metallic-dark group inline-flex w-full items-center justify-center gap-2.5 rounded-full px-8 py-[14px] text-[15px] font-semibold text-white sm:w-auto"
               >
                 <AppleIcon className="h-[15px] w-[13px] transition-transform duration-200 group-hover:scale-105" />
@@ -377,6 +377,10 @@ function Hero() {
               </span>
               <span className="hidden h-3 w-px bg-line sm:block" />
               <span>No account required</span>
+              <span className="hidden h-3 w-px bg-line sm:block" />
+              <a href="#/releases" className="underline decoration-line underline-offset-4 transition-colors duration-200 hover:text-ink-900">
+                Install guide & versions
+              </a>
               <span className="hidden h-3 w-px bg-line sm:block" />
               <span>On-device & private</span>
             </div>
@@ -1119,9 +1123,7 @@ function Footer() {
             <p className="mt-3 text-sm leading-6 text-ink-600">Native Mac dictation — press the hotkey, speak, paste. Open-source Wispr Flow for macOS.</p>
             <div className="mt-4 flex gap-2">
               <a
-                href={RELEASES_URL}
-                target="_blank"
-                rel="noreferrer"
+                href={DOWNLOAD_URL}
                 className="metallic-dark inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold text-white"
               >
                 <AppleIcon className="h-3 w-[10px]" /> Download
