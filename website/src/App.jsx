@@ -131,7 +131,7 @@ function formatStars(n) {
   return String(n);
 }
 
-function Nav() {
+function Nav({ onDownload }) {
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [stars, setStars] = useState(() => {
@@ -302,7 +302,10 @@ function Nav() {
               </a>
               <a
                 href={DOWNLOAD_URL}
-                onClick={() => setOpen(false)}
+                onClick={() => {
+                  setOpen(false);
+                  onDownload?.();
+                }}
                 className="metallic-dark inline-flex items-center justify-center gap-2 rounded-full px-4 py-3 text-sm font-semibold text-white"
               >
                 <AppleIcon className="h-4 w-4" /> Download for Mac
@@ -316,7 +319,7 @@ function Nav() {
 }
 
 // ─── Hero — center blob only, fully static, fixed to viewport center — side blobs removed 2026-08-07 ───
-function Hero() {
+function Hero({ onDownload }) {
   return (
     <section className="relative overflow-hidden">
       <div className="relative mx-auto max-w-[1040px] px-5 pb-10 pt-28 sm:px-6 sm:pb-14 sm:pt-36">
@@ -354,6 +357,7 @@ function Hero() {
             <div id="download" className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <a
                 href={DOWNLOAD_URL}
+                onClick={() => onDownload?.()}
                 className="metallic-dark group inline-flex w-full items-center justify-center gap-2.5 rounded-full px-8 py-[14px] text-[15px] font-semibold text-white sm:w-auto"
               >
                 <AppleIcon className="h-[15px] w-[13px] transition-transform duration-200 group-hover:scale-105" />
@@ -979,6 +983,96 @@ function ReleaseCard({ release, latest, delay }) {
   );
 }
 
+// ─── Download modal — shown when a Download CTA is clicked, while the zip downloads.
+// Same metallic/ink language as the page; scales+fades in and out (180ms soft ease).
+function DownloadModal({ open, onClose }) {
+  const [closing, setClosing] = useState(false);
+  const close = () => {
+    setClosing(true);
+    setTimeout(() => {
+      setClosing(false);
+      onClose();
+    }, 180);
+  };
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e) => e.key === "Escape" && close();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
+  if (!open) return null;
+
+  const entering = !closing;
+  return (
+    <div
+      onClick={close}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Install WisperVoice"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+      style={{
+        background: "rgba(9,9,11,0.45)",
+        backdropFilter: "blur(6px)",
+        opacity: entering ? 1 : 0,
+        transition: "opacity 180ms cubic-bezier(0.16,1,0.3,1)",
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="metallic-card w-full max-w-[460px] rounded-[24px] p-6 sm:p-7"
+        style={{
+          opacity: entering ? 1 : 0,
+          transform: entering ? "scale(1) translateY(0)" : "scale(0.96) translateY(8px)",
+          transition: "opacity 180ms cubic-bezier(0.16,1,0.3,1), transform 180ms cubic-bezier(0.16,1,0.3,1)",
+        }}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="grid h-8 w-8 place-items-center rounded-lg bg-ink-900 text-white">
+                <Download className="h-4 w-4" strokeWidth={1.8} />
+              </span>
+              <div className="text-[15px] font-semibold tracking-tight text-ink-900">Your download has started</div>
+            </div>
+            <p className="mt-2 text-[13px] leading-6 text-ink-600">Two quick steps once it lands:</p>
+          </div>
+          <button onClick={close} aria-label="Close" className="metallic-pill grid h-8 w-8 shrink-0 place-items-center rounded-full">
+            <X className="h-3.5 w-3.5 text-ink-600" strokeWidth={1.8} />
+          </button>
+        </div>
+
+        <ol className="mt-4 space-y-3">
+          {[
+            ["1", "Unzip, then drag WisperVoice.app into Applications."],
+            ["2", "First open: macOS shows a warning (we're not notarized yet). Go to System Settings → Privacy & Security → scroll down → Open Anyway."],
+          ].map(([n, text]) => (
+            <li key={n} className="flex gap-3 text-[13px] leading-6 text-ink-600">
+              <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-ink-900 font-mono text-[11px] font-semibold text-white">{n}</span>
+              <span>{text}</span>
+            </li>
+          ))}
+        </ol>
+
+        <div className="mt-5 border-t border-line pt-4">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs leading-5 text-ink-600">
+              <span className="font-semibold text-ink-900">Prefer no warning at all?</span> Install from Terminal instead:
+            </p>
+            <CopyCommandButton command={INSTALL_CMD} />
+          </div>
+          <pre className="mt-2.5 overflow-x-auto rounded-xl bg-ink-950 p-3.5 font-mono text-[11px] leading-5 text-white/85">{INSTALL_CMD}</pre>
+        </div>
+
+        <div className="mt-4 text-center">
+          <a href="#/releases" onClick={close} className="text-xs font-medium text-ink-400 transition-colors duration-200 hover:text-ink-900">
+            Full install guide &amp; all versions →
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function CopyCommandButton({ command }) {
   const [copied, setCopied] = useState(false);
   return (
@@ -1144,7 +1238,7 @@ function ReleasesPage() {
   );
 }
 
-function Footer() {
+function Footer({ onDownload }) {
   return (
     <footer className="bg-white">
       <div className="mx-auto max-w-[1040px] px-5 py-10 sm:px-6 sm:py-12">
@@ -1161,6 +1255,7 @@ function Footer() {
             <div className="mt-4 flex gap-2">
               <a
                 href={DOWNLOAD_URL}
+                onClick={() => onDownload?.()}
                 className="metallic-dark inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold text-white"
               >
                 <AppleIcon className="h-3 w-[10px]" /> Download
@@ -1318,6 +1413,7 @@ export default function App() {
   // Hash-based routing (#/releases) — works on any static host, no server rewrites,
   // and plain #section anchors on the landing page keep working untouched.
   const [route, setRoute] = useState(() => window.location.hash);
+  const [showDownload, setShowDownload] = useState(false);
   useEffect(() => {
     const onHash = () => setRoute(window.location.hash);
     window.addEventListener("hashchange", onHash);
@@ -1346,19 +1442,20 @@ export default function App() {
         className="pointer-events-none fixed left-1/2 top-1/2 -z-10 h-[90vh] w-[90vw] -translate-x-1/2 -translate-y-1/2 rounded-full blur-[32px]"
         style={{ background: "radial-gradient(50% 50% at 50% 50%, rgba(91,74,211,0.09) 0%, rgba(124,92,252,0.05) 42%, transparent 70%)", opacity: 0.87 }}
       />
-      <Nav />
+      <Nav onDownload={() => setShowDownload(true)} />
       {onReleases ? (
         <ReleasesPage />
       ) : (
         <>
-          <Hero />
+          <Hero onDownload={() => setShowDownload(true)} />
           <Features />
           <HowItWorks />
           <Demo />
           <FAQ />
         </>
       )}
-      <Footer />
+      <Footer onDownload={() => setShowDownload(true)} />
+      <DownloadModal open={showDownload} onClose={() => setShowDownload(false)} />
     </div>
   );
 }
