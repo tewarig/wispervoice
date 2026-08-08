@@ -38,10 +38,11 @@ struct MenuBarView: View {
             footer
         }
         .frame(width: 380)
+        .tint(Theme.violetAccent)
         .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: Theme.radiusCard, style: .continuous))
         .shadow(color: .black.opacity(Theme.shadow), radius: 20, y: 8)
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(.primary.opacity(Theme.hairline), lineWidth: 1))
+        .overlay(RoundedRectangle(cornerRadius: Theme.radiusCard).stroke(.primary.opacity(Theme.hairline), lineWidth: 1))
         .onAppear { permissions.refresh() }
         .animation(.spring(response: 0.32, dampingFraction: 0.82), value: dictation.state)
         .animation(.spring(response: 0.3, dampingFraction: 0.85), value: dictation.lastTranscript)
@@ -51,10 +52,11 @@ struct MenuBarView: View {
     private var header: some View {
         HStack(spacing: 10) {
             ZStack {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(Theme.accent)
+                RoundedRectangle(cornerRadius: Theme.radiusControl, style: .continuous)
+                    .fill(LinearGradient(colors: [Theme.violetAccent, Theme.violetAccent.opacity(0.75)],
+                                         startPoint: .topLeading, endPoint: .bottomTrailing))
                     .frame(width: 36, height: 36)
-                    .shadow(color: Theme.accent.opacity(0.25), radius: 8, y: 4)
+                    .shadow(color: Theme.violetAccent.opacity(0.30), radius: 8, y: 4)
                 Image(systemName: "waveform.and.mic")
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(.white)
@@ -122,18 +124,18 @@ struct MenuBarView: View {
             }
             .padding(10)
             .background {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                RoundedRectangle(cornerRadius: Theme.radiusControl, style: .continuous)
                     .fill(.background)
                     .shadow(color: .black.opacity(isHoveringMain ? Theme.shadow : Theme.shadow / 2), radius: isHoveringMain ? 10 : 6, y: 4)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 12).strokeBorder(
+                        RoundedRectangle(cornerRadius: Theme.radiusControl).strokeBorder(
                             isRecording ? Theme.alert.opacity(Theme.softFill) : Color.primary.opacity(Theme.hairline), lineWidth: 1
                         )
                     )
             }
             .overlay {
                 if isRecording {
-                    RoundedRectangle(cornerRadius: 12).stroke(Theme.alert.opacity(Theme.softFill), lineWidth: 1)
+                    RoundedRectangle(cornerRadius: Theme.radiusControl).stroke(Theme.alert.opacity(Theme.softFill), lineWidth: 1)
                         .matchedGeometryEffect(id: "cta", in: ns)
                 }
             }
@@ -153,7 +155,8 @@ struct MenuBarView: View {
                         .font(.caption.weight(.semibold)).foregroundStyle(Theme.alert)
                     VStack(spacing: 6) {
                         if !permissions.micGranted { permRow("Microphone", icon: "mic.slash", action: { PermissionsManager.requestMicrophonePermission() }) }
-                        if !permissions.speechGranted { permRow("Speech Recognition", icon: "waveform.badge.mic", action: { permissions.requestSpeechPermission() }) }
+                        // Speech Recognition is only needed by the Apple Speech engine.
+                        if PermissionsManager.speechRequired && !permissions.speechGranted { permRow("Speech Recognition", icon: "waveform.badge.mic", action: { permissions.requestSpeechPermission() }) }
                         if !permissions.accessibilityGranted { permRow("Accessibility", icon: "cursorarrow.click.2", action: { permissions.requestAccessibility() }) }
                     }
                     Button("Recheck") { permissions.refresh() }
@@ -161,8 +164,8 @@ struct MenuBarView: View {
                         .buttonStyle(.bordered).controlSize(.mini).tint(Theme.alert)
                 }
                 .padding(12)
-                .background(Theme.alert.opacity(Theme.hairline), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.alert.opacity(Theme.subtleFill), lineWidth: 1))
+                .background(Theme.alert.opacity(Theme.hairline), in: RoundedRectangle(cornerRadius: Theme.radiusControl, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: Theme.radiusControl).stroke(Theme.alert.opacity(Theme.subtleFill), lineWidth: 1))
                 .padding(.horizontal, 12).padding(.top, 4)
             }
         }
@@ -180,21 +183,19 @@ struct MenuBarView: View {
                     withAnimation { showCopied = true }
                     DispatchQueue.main.asyncAfter(deadline: .now()+1.5){ withAnimation { showCopied=false } }
                 }
-                .font(.caption.weight(.medium))
-                .buttonStyle(.bordered).controlSize(.mini)
+                .buttonStyle(.bordered).controlSize(.small)
                 .contentTransition(.numericText())
 
                 Button("Paste Again") { TextInjector.inject(text: dictation.lastTranscript) }
-                    .font(.caption.weight(.medium))
-                    .buttonStyle(.borderedProminent).controlSize(.mini)
+                    .buttonStyle(.borderedProminent).controlSize(.small)
             }
             Text(dictation.lastTranscript)
                 .font(Theme.transcript)
                 .lineSpacing(2)
                 .padding(10)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.primary.opacity(Theme.hairline), lineWidth: 1))
+                .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: Theme.radiusControl, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: Theme.radiusControl).stroke(Color.primary.opacity(Theme.hairline), lineWidth: 1))
                 .textSelection(.enabled)
         }
     }
@@ -204,7 +205,7 @@ struct MenuBarView: View {
             if !history.items.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
-                        Text("History").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                        SectionLabel("Recent")
                         Spacer()
                         Button("Clear", role: .destructive) { withAnimation { history.clear() } }
                             .font(.caption).buttonStyle(.plain).foregroundStyle(.secondary)
@@ -227,8 +228,8 @@ struct MenuBarView: View {
                                             .font(.caption2).foregroundStyle(.quaternary)
                                     }
                                     .padding(9)
-                                    .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
-                                    .overlay(RoundedRectangle(cornerRadius: 9).stroke(Color.primary.opacity(Theme.hairline), lineWidth: 1))
+                                    .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: Theme.radiusControl, style: .continuous))
+                                    .overlay(RoundedRectangle(cornerRadius: Theme.radiusControl).stroke(Color.primary.opacity(Theme.hairline), lineWidth: 1))
                                 }
                                 .buttonStyle(.plain)
                                 .swipeActions(edge: .trailing, allowsFullSwipe: true) {
@@ -250,18 +251,29 @@ struct MenuBarView: View {
 
     private var footer: some View {
         HStack(spacing: 8) {
-            Button { NSApp.activate(ignoringOtherApps: true); if let w = NSApp.windows.first(where: { $0.identifier?.rawValue == "main" }) { w.makeKeyAndOrderFront(nil) } else { NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil) } } label: { Label("Open App", systemImage: "macwindow") }
+            // Dynamic selectors: the test target compiles this file without WisperVoiceApp.swift,
+            // so the AppDelegate type itself must not be referenced here.
+            Button { NSApp.sendAction(Selector(("openMain")), to: NSApp.delegate, from: nil) } label: { Label("Open App", systemImage: "macwindow") }
                 .font(.caption.weight(.medium)).buttonStyle(.bordered).controlSize(.small)
-            SettingsLink { Label("Settings", systemImage: "gearshape") }
+            Button { NSApp.sendAction(Selector(("openSettings")), to: NSApp.delegate, from: nil) } label: { Label("Settings", systemImage: "gearshape") }
                 .font(.caption.weight(.medium))
                 .buttonStyle(.bordered).controlSize(.small)
             Spacer()
+            // Which dev build is running — CFBundleName carries the incrementing
+            // wisperflowNN name stamped by scripts/dev-install.sh.
+            Text(buildLabel).font(.caption2).foregroundStyle(.tertiary)
             Button("Quit") { NSApplication.shared.terminate(nil) }
                 .font(.caption.weight(.medium))
                 .buttonStyle(.plain).foregroundStyle(.secondary)
         }
         .padding(.horizontal, 12).padding(.vertical, 10)
         .background(.bar)
+    }
+
+    private var buildLabel: String {
+        let name = Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String ?? "dev"
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?"
+        return "\(name) · b\(build)"
     }
 
     private func permRow(_ title: String, icon: String, action: @escaping ()->Void) -> some View {
@@ -284,5 +296,5 @@ struct MenuBarView: View {
         case .injecting: return "Inserted ✓"
         }
     }
-    private var hintText: String { "⌥Space  •  Fn×2" }
+    private var hintText: String { HotkeyManager.currentHintLabel }
 }

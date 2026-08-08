@@ -17,7 +17,7 @@ final class OverlayWindow: NSPanel {
     private var hideToken = 0
 
     init() {
-        let rect = NSRect(x: 0, y: 0, width: 420, height: 72)
+        let rect = NSRect(x: 0, y: 0, width: 480, height: 52)
         super.init(contentRect: rect, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         isOpaque = false
         backgroundColor = .clear
@@ -54,36 +54,56 @@ final class OverlayWindow: NSPanel {
     func show(state: DictationState, level: Float, transcript: String) {
         hosting?.rootView = OverlayView(state: state, level: level, transcript: transcript, onCopy: { [weak self] t in self?.copyTranscript(t) }, onClose: { [weak self] in self?.onClose?() })
 
-        // The pill floats at bottom-centre — directly over the message composer in Slack/Discord/
-        // Chrome. While the user is talking it must not intercept clicks meant for that field;
-        // it only becomes clickable once there is a result worth copying.
-        ignoresMouseEvents = (state == .recording || state == .transcribing)
+        // Always clickable: the × must be able to cancel mid-recording (it used to be dead
+        // because the window ignored mouse events while recording). The panel is
+        // non-activating, so clicks on it never steal focus from the app being dictated into.
+        ignoresMouseEvents = false
 
         hideToken &+= 1              // supersede any fade-out already in flight
-        guard !isPresented || !isVisible else { return }
-        isPresented = true
 
-        // Ensure visible on active Space even when Chrome/fullscreen frontmost
-        self.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary, .ignoresCycle]
-        self.level = .statusBar
-        // Multi-desktop/multi-monitor: recenter on active screen (mouse or keyWindow), not just NSScreen.main at launch
-        let targetScreen: NSScreen? = {
-            let mouse = NSEvent.mouseLocation
-            if let found = NSScreen.screens.first(where: { NSMouseInRect(mouse, $0.frame, false) }) { return found }
-            if let key = NSApp.keyWindow?.screen { return key }
-            if let main = NSScreen.main { return main }
-            return NSScreen.screens.first
-        }()
-        if let screen = targetScreen {
-            let w: CGFloat = 420, h: CGFloat = 72
-            let x = screen.frame.midX - w/2
-            let y = screen.frame.minY + 96
-            // Keep within visibleFrame (notch/Dock)
-            let visible = screen.visibleFrame
-            let clampedY = max(visible.minY + 12, min(y, visible.maxY - h - 12))
-            let clampedX = max(visible.minX + 12, min(x, visible.maxX - w - 12))
-            self.setFrameOrigin(NSPoint(x: clampedX, y: clampedY))
+        // The window hugs the capsule (plus a small shadow margin) instead of a fixed
+        // 480pt: an invisible full-width window was swallowing clicks aimed at the
+        // composer underneath while recording, and mis-aligned the left/right positions.
+        // Frame updates run on every call, but only when the size actually changes.
+        let capsuleW = OverlayView.width(state: state, transcriptEmpty: transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        let w = capsuleW + 24, h: CGFloat = 52
+        let firstPresentation = !isPresented || !isVisible
+
+        if firstPresentation {
+            isPresented = true
+            // Ensure visible on active Space even when Chrome/fullscreen frontmost
+            self.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary, .ignoresCycle]
+            self.level = .statusBar
         }
+
+        if firstPresentation || abs(frame.width - w) > 0.5 {
+            // Multi-desktop/multi-monitor: recenter on active screen (mouse or keyWindow), not just NSScreen.main at launch
+            let targetScreen: NSScreen? = {
+                let mouse = NSEvent.mouseLocation
+                if let found = NSScreen.screens.first(where: { NSMouseInRect(mouse, $0.frame, false) }) { return found }
+                if let key = NSApp.keyWindow?.screen { return key }
+                if let main = NSScreen.main { return main }
+                return NSScreen.screens.first
+            }()
+            if let screen = targetScreen {
+                let visible = screen.visibleFrame
+                let margin: CGFloat = 24
+                // User-selectable placement (Settings → Behavior → Pill position).
+                let position = UserDefaults.standard.string(forKey: "pill.position") ?? "bottom-center"
+                let x: CGFloat
+                switch position.split(separator: "-").last {
+                case "left":  x = visible.minX + margin
+                case "right": x = visible.maxX - w - margin
+                default:      x = visible.midX - w / 2
+                }
+                let y: CGFloat = position.hasPrefix("top")
+                    ? visible.maxY - h - margin
+                    : visible.minY + margin
+                self.setFrame(NSRect(x: x, y: y, width: w, height: h), display: true)
+            }
+        }
+
+        guard firstPresentation else { return }
         DispatchQueue.main.async {
             // Retarget any running fade-out back to opaque before ordering in
             NSAnimationContext.runAnimationGroup { ctx in
@@ -131,88 +151,78 @@ struct OverlayView: View {
     var onClose: (() -> Void)? = nil
     @State private var didCopy = false
 
+    // Layout (per user spec): no mic circle. Waveform + live text that tail-follows what
+    // you're saying (head truncation = old words slide away, newest stay visible). Copy
+    // appears once dictation finishes, not while recording.
     var body: some View {
-        HStack(spacing: 14) {
-            ZStack {
-                Circle().fill(colorForState.opacity(state == .recording ? 0.22 : 0.12))
-                    .frame(width: 44, height: 44)
-                    .blur(radius: state == .recording ? 6 : 0)
-                Circle()
-                    .fill(.ultraThinMaterial)
-                    .frame(width: 42, height: 42)
-                    .overlay(Circle().stroke(Theme.onGlass.opacity(Theme.softFill), lineWidth: 1))
-                    .shadow(color: colorForState.opacity(0.18), radius: 8, y: 4)
-                Image(systemName: iconForState)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(colorForState)
-                    .contentTransition(.symbolEffect(.replace))
-                    .symbolEffect(.bounce, value: state)
-                if state == .recording {
-                    Circle().stroke(colorForState.opacity(0.45), lineWidth: 2)
-                        .scaleEffect(1 + CGFloat(level) * 0.45)
-                        .opacity(1 - Double(level) * 0.3)
-                        .animation(.easeInOut(duration: 0.35), value: level)
-                }
-            }
-            .frame(width: 44, height: 44)
-
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
-                    Text(titleForState)
-                        .font(.system(size: 13.5, weight: .semibold, design: .rounded))
+        HStack(spacing: 12) {
+            // Leading status: waveform while recording, spinner while transcribing, tick when done
+            Group {
+                switch state {
+                case .recording:
+                    HStack(spacing: 7) {
+                        Circle().fill(Theme.alert).frame(width: 6, height: 6)
+                            .opacity(0.5 + Double(level) * 0.5)
+                            .animation(.easeInOut(duration: 0.2), value: level)
+                        // Symmetric center-peaked bars. Raw RMS speech levels are ~0.1–0.4,
+                        // which barely moved the old bars — amplify for a visible dance.
+                        HStack(spacing: 2.5) {
+                            ForEach(0..<5, id: \.self) { i in
+                                let mult: CGFloat = [0.5, 0.8, 1.0, 0.8, 0.5][i]
+                                let v = min(1, CGFloat(level) * 2.6)
+                                RoundedRectangle(cornerRadius: 1.5, style: .continuous)
+                                    .fill(Theme.onGlassPrimary)
+                                    .frame(width: 3, height: 5 + v * 20 * mult)
+                                    .animation(.spring(response: 0.22, dampingFraction: 0.6).delay(Double(i) * 0.02), value: level)
+                            }
+                        }
+                        .frame(height: 26)
+                    }
+                case .transcribing:
+                    ProgressView().controlSize(.mini).tint(Theme.onGlassPrimary)
+                case .injecting:
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(Theme.onGlassPrimary)
-                    if state == .recording {
-                        Circle().fill(Theme.alert).frame(width: 6, height: 6).symbolEffect(.pulse)
-                    }
-                }
-                Group {
-                    if state == .recording {
-                        // Live dictation text
-                        if transcript.isEmpty {
-                            Text("Listening… press again to stop")
-                                .font(Theme.compact)
-                                .foregroundStyle(Theme.onGlassSecondary)
-                        } else {
-                            Text(transcript)
-                                .font(Theme.compact)
-                                .foregroundStyle(Theme.onGlassPrimary)
-                                .lineLimit(1)
-                                .contentTransition(.opacity)
-                        }
-                    } else if !transcript.isEmpty && state != .recording {
-                        Text(transcript)
-                            .font(Theme.compact)
-                            .foregroundStyle(Theme.onGlassSecondary)
-                            .lineLimit(1)
-                    } else if state == .transcribing {
-                        HStack(spacing: 6) {
-                            ProgressView().controlSize(.mini).tint(Theme.onGlassPrimary)
-                            Text("Transcribing…").font(Theme.compact).foregroundStyle(Theme.onGlassSecondary)
-                        }
-                    } else if state == .injecting {
-                        Text("Pasted at cursor ✓").font(Theme.compact).foregroundStyle(Theme.onGlassSecondary)
-                    } else {
-                        Text("⌥Space  •  Fn×2  to dictate").font(Theme.compact).foregroundStyle(Theme.onGlassSecondary)
-                    }
+                case .idle:
+                    Image(systemName: "waveform")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(Theme.onGlassSecondary)
                 }
             }
+            .frame(minWidth: 30, alignment: .leading)
 
-            Spacer()
-
-            if state == .recording {
-                HStack(spacing: 3) {
-                    ForEach(0..<5, id: \.self) { i in
-                        RoundedRectangle(cornerRadius: 2, style: .continuous)
-                            .fill(Theme.onGlassPrimary)
-                            .frame(width: 3, height: 10 + CGFloat(level) * 16 * (i % 2 == 0 ? 1 : 0.55) + CGFloat(i) * 1.2)
-                            .animation(.easeInOut(duration: 0.18).delay(Double(i)*0.04), value: level)
+            // Live text — single line, head-truncated so the newest words are always visible.
+            // No "Listening…" placeholder: the red dot + dancing bars already say that.
+            Group {
+                if state == .recording {
+                    if !transcript.isEmpty {
+                        Text(transcript).foregroundStyle(Theme.onGlassPrimary)
+                    } else if !Self.livePreviewAvailable {
+                        // Non-Apple engines have no live partials — set expectations.
+                        Text("Transcribes when you stop").foregroundStyle(Theme.onGlassSecondary)
                     }
+                } else if state == .transcribing {
+                    Text(transcript.isEmpty ? "Transcribing…" : transcript)
+                        .foregroundStyle(Theme.onGlassSecondary)
+                } else if !transcript.isEmpty {
+                    Text(transcript).foregroundStyle(Theme.onGlassPrimary)
+                } else {
+                    Text("\(HotkeyManager.currentHintLabel)  to dictate")
+                        .foregroundStyle(Theme.onGlassSecondary)
                 }
-                .frame(height: 28)
             }
+            .font(.system(size: 12.5, design: .rounded))
+            .lineLimit(1)
+            .truncationMode(.head)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .animation(.easeOut(duration: 0.15), value: transcript)
 
-            // Copy button — when transcript present (live or result)
-            if !transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && state != .idle {
+            // Copy — once there is a finished result to take away. Idle counts: after a
+            // dictation the pill lingers in idle precisely so Copy stays reachable when
+            // the text couldn't be inserted at the cursor.
+            if state != .recording,
+               !transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 Button(action: {
                     onCopy?(transcript)
                     withAnimation { didCopy = true }
@@ -221,10 +231,10 @@ struct OverlayView: View {
                     HStack(spacing: 4) {
                         Image(systemName: didCopy ? "checkmark.circle.fill" : "doc.on.doc")
                         Text(didCopy ? "Copied" : "Copy")
-                            .font(.system(size: 11, weight: .semibold, design: .rounded))
+                            .font(.system(size: 11.5, weight: .semibold, design: .rounded))
                     }
                     .foregroundStyle(.white)
-                    .padding(.horizontal, 10).padding(.vertical, 6)
+                    .padding(.horizontal, 10).padding(.vertical, 5)
                     .background(didCopy ? Theme.accent : Theme.onGlass.opacity(Theme.subtleFill), in: Capsule())
                     .overlay(Capsule().stroke(Theme.onGlass.opacity(Theme.hairline), lineWidth: 1))
                 }
@@ -238,9 +248,10 @@ struct OverlayView: View {
             // Close button — always visible when not idle
             if state != .idle {
                 Button(action: { onClose?() }) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 18))
+                    Image(systemName: "xmark")
+                        .font(.system(size: 10, weight: .bold))
                         .foregroundStyle(Theme.onGlassSecondary)
+                        .frame(width: 20, height: 20)
                         .background(Circle().fill(Theme.onGlass.opacity(Theme.subtleFill)))
                 }
                 .buttonStyle(.plain)
@@ -248,35 +259,39 @@ struct OverlayView: View {
                 .help("Stop / Close")
             }
         }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 12)
-        .frame(width: 420, height: 72)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 7)
+        // The capsule grows as content arrives: compact while just recording, wide once
+        // live text streams in (or a result is shown). The window itself stays 480pt;
+        // the capsule animates inside it.
+        .frame(width: pillWidth, height: 40)
         .background {
             Capsule(style: .continuous)
                 .fill(Theme.glassBody)
                 .overlay(Capsule(style: .continuous).strokeBorder(Theme.onGlass.opacity(Theme.hairline), lineWidth: 1))
-                .shadow(color: .black.opacity(0.22), radius: 22, y: 10)
-                .shadow(color: colorForState.opacity(state == .recording ? 0.18 : 0), radius: 18, y: 6)
+                .shadow(color: .black.opacity(0.20), radius: 18, y: 8)
         }
         .clipShape(Capsule(style: .continuous))
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .sensoryFeedback(.impact, trigger: state)
     }
 
-    private var iconForState: String {
+    /// Only Apple Speech produces partials while you talk.
+    private static var livePreviewAvailable: Bool {
+        (UserDefaults.standard.string(forKey: AISettingsKeys.sttProvider) ?? "apple-speech") == "apple-speech"
+    }
+
+    /// Capsule width for a given state — also drives the WINDOW frame (OverlayWindow.show),
+    /// which hugs the capsule so no invisible margin swallows clicks meant for the app below.
+    static func width(state: DictationState, transcriptEmpty: Bool) -> CGFloat {
         switch state {
-        case .idle: return "waveform"
-        case .recording: return "mic.fill"
-        case .transcribing: return "waveform.badge.magnifyingglass"
-        case .injecting: return "checkmark.circle.fill"
+        case .recording: return transcriptEmpty ? (livePreviewAvailable ? 118 : 250) : 460
+        case .idle: return transcriptEmpty ? 250 : 460
+        case .transcribing, .injecting: return 460
         }
     }
-    private var colorForState: Color { Theme.onGlassColor(for: state) }
-    private var titleForState: String {
-        switch state {
-        case .idle: return "WisperVoice"
-        case .recording: return "Recording"
-        case .transcribing: return "Transcribing"
-        case .injecting: return "Inserted ✓"
-        }
+
+    private var pillWidth: CGFloat {
+        Self.width(state: state, transcriptEmpty: transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
     }
 }

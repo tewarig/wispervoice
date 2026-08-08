@@ -99,3 +99,6 @@ WisperVoice-*.zip
 WisperVoice-*.dmg
 checksums.txt
 release_notes.md
+
+# Per-machine dev build counter (scripts/dev-install.sh)
+scripts/.dev-build-number

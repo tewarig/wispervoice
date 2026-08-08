@@ -7,6 +7,10 @@ final class AudioRecorder: NSObject {
     private var fileURL: URL?
     /// Called on audio thread with RMS level 0...1 for VAD/waveform
     var onLevel: ((Float) -> Void)?
+    /// Called on audio thread with each raw buffer — feeds live speech recognition.
+    /// Without this the SFSpeechAudioBufferRecognitionRequest never receives audio and
+    /// live transcription silently produces nothing.
+    var onBuffer: ((AVAudioPCMBuffer) -> Void)?
 
     var isRecording: Bool { engine?.isRunning == true }
 
@@ -53,6 +57,7 @@ final class AudioRecorder: NSObject {
 
         input.installTap(onBus: 0, bufferSize: 4096, format: format) { [weak self] buffer, _ in
             do { try file.write(from: buffer) } catch { }
+            self?.onBuffer?(buffer)
             // RMS for VAD + waveform — compute quickly on tap thread
             if let ch = buffer.floatChannelData?[0] {
                 let n = Int(buffer.frameLength)
@@ -80,6 +85,7 @@ final class AudioRecorder: NSObject {
         engine?.stop()
         engine = nil
         audioFile = nil
+        onBuffer = nil
         let url = fileURL
         fileURL = nil
         return url
@@ -90,6 +96,7 @@ final class AudioRecorder: NSObject {
         engine?.stop()
         engine = nil
         audioFile = nil
+        onBuffer = nil
         if let url = fileURL { try? FileManager.default.removeItem(at: url) }
         fileURL = nil
     }

@@ -5,6 +5,8 @@ import ApplicationServices
 import SwiftUI
 
 final class PermissionsManager: ObservableObject {
+    static let shared = PermissionsManager()
+
     @Published var micGranted: Bool = false
     @Published var speechGranted: Bool = false
     @Published var accessibilityGranted: Bool = false
@@ -62,26 +64,62 @@ final class PermissionsManager: ObservableObject {
         _ = AXIsProcessTrustedWithOptions(opts)
     }
 
+    /// Launch-time variant: prompt only when the user has never been asked. Never opens
+    /// System Settings — the launch path calling the button variant below meant EVERY
+    /// start of the app yanked System Settings open for users who had already granted.
+    static func requestMicrophonePermissionAtLaunch() {
+        if AVCaptureDevice.authorizationStatus(for: .audio) == .notDetermined {
+            AVCaptureDevice.requestAccess(for: .audio) { _ in }
+        }
+    }
+
+    /// Button variant (permissions banner "Enable"): the user explicitly asked, so when
+    /// the system prompt can't fire again, send them to the pane instead of doing nothing.
     static func requestMicrophonePermission() {
         switch AVCaptureDevice.authorizationStatus(for: .audio) {
         case .notDetermined:
             AVCaptureDevice.requestAccess(for: .audio) { _ in }
-        default: break
+        default:
+            openSystemSettings(pane: "Privacy_Microphone")
         }
     }
 
     func requestSpeechPermission() {
-        SFSpeechRecognizer.requestAuthorization { status in
-            DispatchQueue.main.async { self.refresh() }
+        switch SFSpeechRecognizer.authorizationStatus() {
+        case .notDetermined:
+            SFSpeechRecognizer.requestAuthorization { _ in
+                DispatchQueue.main.async { self.refresh() }
+            }
+        default:
+            Self.openSystemSettings(pane: "Privacy_SpeechRecognition")
         }
     }
 
     func requestAccessibility() {
+        // First click: let the system consent dialog do its job alone. Opening the pane
+        // in the same tick raced the dialog — System Settings activated over and hid it.
+        let alreadyPrompted = UserDefaults.standard.bool(forKey: "axPromptedOnce")
         let opts = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
-        AXIsProcessTrustedWithOptions(opts)
+        let trusted = AXIsProcessTrustedWithOptions(opts)
+        UserDefaults.standard.set(true, forKey: "axPromptedOnce")
         // Poll for grant
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) { self.refresh() }
+        if !trusted && alreadyPrompted {
+            Self.openSystemSettings(pane: "Privacy_Accessibility")
+        }
     }
 
-    var allGranted: Bool { micGranted && speechGranted && accessibilityGranted }
+    private static func openSystemSettings(pane: String) {
+        guard let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?\(pane)") else { return }
+        NSWorkspace.shared.open(url)
+    }
+
+    /// Speech Recognition is an Apple-Speech-engine dependency, not an app-wide one.
+    /// Whisper.cpp / OpenAI / other engines never touch SFSpeechRecognizer, so the app
+    /// must not nag for (or block "all granted" on) a permission it will not use.
+    static var speechRequired: Bool {
+        (UserDefaults.standard.string(forKey: AISettingsKeys.sttProvider) ?? "apple-speech") == "apple-speech"
+    }
+
+    var allGranted: Bool { micGranted && accessibilityGranted && (speechGranted || !Self.speechRequired) }
 }

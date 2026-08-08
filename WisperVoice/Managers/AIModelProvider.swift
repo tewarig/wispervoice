@@ -191,19 +191,22 @@ struct ParakeetProvider: AIModelProvider {
     }
 }
 
+// Keeps the historical id "openai-whisper" (stored settings reference it), but the server
+// is configurable via CloudConfig — OpenAI, Groq, Mistral, or any OpenAI-compatible URL.
 struct OpenAIWhisperProvider: AIModelProvider {
     let id = "openai-whisper"
-    let displayName = "OpenAI Whisper"
-    let subtitle = "Cloud • whisper-1 • pay-per-use"
+    let displayName = "Cloud Whisper"
+    let subtitle = "Cloud • OpenAI-compatible — works with OpenAI, Groq, Mistral"
     let capabilities: Set<AICapability> = [.transcription]
     let isLocal = false
     let requiresAPIKey = true
-    let availableModels: [AIModel] = [
-        AIModel(id: "whisper-1", displayName: "whisper-1 (Cloud)", providerId: "openai-whisper",
-                url: URL(string: "https://api.openai.com/v1/audio/transcriptions")!, sizeMB: 0, capability: .transcription, description: "OpenAI hosted whisper-1"),
-    ]
+    var availableModels: [AIModel] {
+        [AIModel(id: "whisper-1", displayName: CloudConfig.sttModel, providerId: "openai-whisper",
+                 url: URL(string: "https://api.openai.com/v1/audio/transcriptions")!, sizeMB: 0, capability: .transcription,
+                 description: "Hosted at \(CloudConfig.baseURL)")]
+    }
     func transcribe(audioURL: URL, modelId: String?, language: String?) async throws -> String {
-        let key = UserDefaults.standard.string(forKey: "openAIKey") ?? ""
+        let key = KeychainStore.get("openAIKey") ?? ""
         return try await TranscriptionService.shared.transcribeWithWhisper(fileURL: audioURL, apiKey: key, language: language)
     }
 }
@@ -408,7 +411,7 @@ final class AIModelRegistry: ObservableObject {
     }
 }
 struct AppleSTTEngine: STTEngine { let id = STTProvider.appleSpeech; func transcribe(fileURL: URL, language: String?) async throws -> String { try await TranscriptionService.shared.transcribeWithAppleSpeech(fileURL: fileURL, locale: Locale(identifier: language ?? "en-US")) }; func supportsStreaming() -> Bool { true } }
-struct WhisperAPI_Engine: STTEngine { let id = STTProvider.openAIWhisper; func transcribe(fileURL: URL, language: String?) async throws -> String { let key = UserDefaults.standard.string(forKey: "openAIKey") ?? ""; return try await TranscriptionService.shared.transcribeWithWhisper(fileURL: fileURL, apiKey: key, language: language) }; func supportsStreaming() -> Bool { false } }
+struct WhisperAPI_Engine: STTEngine { let id = STTProvider.openAIWhisper; func transcribe(fileURL: URL, language: String?) async throws -> String { let key = KeychainStore.get("openAIKey") ?? ""; return try await TranscriptionService.shared.transcribeWithWhisper(fileURL: fileURL, apiKey: key, language: language) }; func supportsStreaming() -> Bool { false } }
 struct LocalWhisperEngine: STTEngine {
     let id: STTProvider = .whisperCPP; let modelId: String
     func transcribe(fileURL: URL, language: String?) async throws -> String {

@@ -1,6 +1,67 @@
 import Foundation
 import Speech
 import AVFoundation
+import Security
+
+/// API keys live in the macOS Keychain — encrypted at rest, unlocked with the user's login.
+/// They previously sat in UserDefaults, which is a PLAINTEXT plist on disk; `migrate()`
+/// moves any legacy value across once and deletes the plaintext copy.
+/// Uses the native Security framework — no third-party dependency needed for this.
+enum KeychainStore {
+    /// Fixed service name — deliberately NOT Bundle.main.bundleIdentifier, which differs
+    /// in the test runner and would fragment stored keys.
+    private static let service = "com.wispervoice.dev"
+
+    /// Unit tests exercise DictationManager.openAIKey, whose didSet writes here. With the
+    /// fixed service name that would overwrite — and on the empty-string assignment DELETE —
+    /// the developer's real key from the login Keychain. Tests get an in-memory store.
+    private static let isTestRun = NSClassFromString("XCTestCase") != nil
+    private static var testStore: [String: String] = [:]
+
+    static func set(_ value: String, account: String) {
+        if isTestRun {
+            if value.isEmpty { testStore.removeValue(forKey: account) } else { testStore[account] = value }
+            return
+        }
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+        ]
+        guard !value.isEmpty else { SecItemDelete(query as CFDictionary); return }
+        let attributes: [String: Any] = [kSecValueData as String: Data(value.utf8)]
+        let status = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
+        if status == errSecItemNotFound {
+            var add = query
+            add[kSecValueData as String] = Data(value.utf8)
+            SecItemAdd(add as CFDictionary, nil)
+        }
+    }
+
+    static func get(_ account: String) -> String? {
+        if isTestRun { return testStore[account] }
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+        ]
+        var result: AnyObject?
+        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess,
+              let data = result as? Data else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+
+    /// One-time move of a legacy plaintext UserDefaults value into the Keychain.
+    /// The plaintext copy is ALWAYS deleted when found — even when the Keychain already
+    /// holds a key — otherwise the plaintext lingers and defeats the point of the move.
+    static func migrate(defaultsKey: String, account: String) {
+        guard let legacy = UserDefaults.standard.string(forKey: defaultsKey), !legacy.isEmpty else { return }
+        if get(account) == nil { set(legacy, account: account) }
+        UserDefaults.standard.removeObject(forKey: defaultsKey)
+    }
+}
 
 enum TranscriptionProvider: String, CaseIterable, Identifiable {
     case appleSpeech = "Apple Speech (On-device)"
@@ -16,10 +77,62 @@ enum TranscriptionProvider: String, CaseIterable, Identifiable {
     }
 }
 
+/// Result of probing an API key against the provider before any transcription is attempted.
+enum APIKeyCheck: Equatable {
+    case valid
+    case invalid
+    case unreachable
+}
+
+/// The cloud engine speaks the OpenAI wire format, but the SERVER is user-configurable —
+/// Groq (~9× cheaper Whisper) and Mistral Voxtral are drop-in compatible, as are local
+/// OpenAI-compatible servers. Unset defaults fall back to OpenAI itself.
+enum CloudConfig {
+    static let baseURLKey = "cloud.baseURL"
+    static let sttModelKey = "cloud.sttModel"
+    static let polishModelKey = "cloud.polishModel"
+
+    static var baseURL: String {
+        let stored = UserDefaults.standard.string(forKey: baseURLKey) ?? ""
+        return stored.isEmpty ? "https://api.openai.com/v1" : stored
+    }
+    static var sttModel: String {
+        let stored = UserDefaults.standard.string(forKey: sttModelKey) ?? ""
+        return stored.isEmpty ? "whisper-1" : stored
+    }
+    static var polishModel: String {
+        let stored = UserDefaults.standard.string(forKey: polishModelKey) ?? ""
+        return stored.isEmpty ? "gpt-4o-mini" : stored
+    }
+    /// Base URL + API path, tolerating a trailing slash in the stored base.
+    static func endpoint(_ path: String) -> URL? {
+        var base = baseURL
+        while base.hasSuffix("/") { base.removeLast() }
+        return URL(string: base + path)
+    }
+}
+
 final class TranscriptionService {
     static let shared = TranscriptionService()
     var urlSession: URLSession = .shared
     init(urlSession: URLSession = .shared) { self.urlSession = urlSession }
+
+    /// Cheap authenticated GET — 200 means the key works, 401/403 means it doesn't.
+    /// Anything else (offline, timeout) is reported as unreachable rather than invalid so
+    /// a network blip never tells the user their key is wrong.
+    func validateOpenAIKey(_ key: String) async -> APIKeyCheck {
+        guard !key.isEmpty, let url = CloudConfig.endpoint("/models") else { return .invalid }
+        var request = URLRequest(url: url)
+        request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
+        request.timeoutInterval = 10
+        guard let (_, response) = try? await urlSession.data(for: request),
+              let http = response as? HTTPURLResponse else { return .unreachable }
+        switch http.statusCode {
+        case 200: return .valid
+        case 401, 403: return .invalid
+        default: return .unreachable
+        }
+    }
 
     // MARK: - Apple Speech (SFSpeechRecognizer) — free, on-device/cloud, supports 100+ languages
     func transcribeWithAppleSpeech(fileURL: URL, locale: Locale = Locale(identifier: "en-US")) async throws -> String {
@@ -50,13 +163,16 @@ final class TranscriptionService {
         }
     }
 
-    // MARK: - OpenAI Whisper API
+    // MARK: - Cloud transcription (OpenAI-compatible: OpenAI, Groq, Mistral, custom)
     func transcribeWithWhisper(fileURL: URL, apiKey: String, language: String? = nil) async throws -> String {
         guard !apiKey.isEmpty else {
-            throw NSError(domain: "WisperVoice", code: -4, userInfo: [NSLocalizedDescriptionKey: "OpenAI API key not set. Add it in Settings."])
+            throw NSError(domain: "WisperVoice", code: -4, userInfo: [NSLocalizedDescriptionKey: "API key not set. Add it in Settings."])
+        }
+        guard let endpoint = CloudConfig.endpoint("/audio/transcriptions") else {
+            throw NSError(domain: "WisperVoice", code: -6, userInfo: [NSLocalizedDescriptionKey: "Invalid server URL — check it in Settings."])
         }
 
-        var req = URLRequest(url: URL(string: "https://api.openai.com/v1/audio/transcriptions")!)
+        var req = URLRequest(url: endpoint)
         req.httpMethod = "POST"
         req.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
 
@@ -67,7 +183,7 @@ final class TranscriptionService {
         func append(_ s: String) { body.append(s.data(using: .utf8)!) }
 
         // model
-        append("--\(boundary)\r\n"); append("Content-Disposition: form-data; name=\"model\"\r\n\r\n"); append("whisper-1\r\n")
+        append("--\(boundary)\r\n"); append("Content-Disposition: form-data; name=\"model\"\r\n\r\n"); append("\(CloudConfig.sttModel)\r\n")
         if let lang = language, !lang.isEmpty {
             append("--\(boundary)\r\n"); append("Content-Disposition: form-data; name=\"language\"\r\n\r\n"); append("\(lang)\r\n")
         }
@@ -131,14 +247,20 @@ final class TranscriptionService {
         return text
     }
 
+    /// Grammar/cleanup pass — same configurable OpenAI-compatible server and key as
+    /// transcription, so cheap chat models (Groq Llama, Mistral small, a local server)
+    /// work as drop-ins for the default gpt-4o-mini.
     func llmPolish(_ text: String, apiKey: String) async throws -> String {
-        var req = URLRequest(url: URL(string: "https://api.openai.com/v1/chat/completions")!)
+        guard let endpoint = CloudConfig.endpoint("/chat/completions") else {
+            throw NSError(domain: "WisperVoice", code: -6, userInfo: [NSLocalizedDescriptionKey: "Invalid server URL — check it in Settings."])
+        }
+        var req = URLRequest(url: endpoint)
         req.httpMethod = "POST"
         req.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         let sys = "You are a dictation formatter. Fix grammar, punctuation, capitalization. Remove filler words (um, uh). Keep the speaker's voice and language. Preserve Hinglish/mixed-language if present. Return ONLY the cleaned text, no quotes, no explanation."
         let body: [String: Any] = [
-            "model": "gpt-4o-mini",
+            "model": CloudConfig.polishModel,
             "temperature": 0.2,
             "messages": [
                 ["role": "system", "content": sys],
@@ -163,8 +285,8 @@ final class TranscriptionService {
     func transcribe(fileURL: URL, providerId: String, modelId: String?, language: String?, apiKey: String?) async throws -> String {
         // Update apiKey if supplied via provider that needs it
         if let key = apiKey, !key.isEmpty {
-            // store transiently for OpenAI provider to read from UserDefaults
-            UserDefaults.standard.set(key, forKey: "openAIKey")
+            // store for the cloud provider to read — Keychain, never UserDefaults
+            KeychainStore.set(key, account: "openAIKey")
         }
         if let provider = AIProviderRegistry.shared.provider(for: providerId) {
             return try await provider.transcribe(audioURL: fileURL, modelId: modelId, language: language)
@@ -174,7 +296,7 @@ final class TranscriptionService {
         case "apple-speech", TranscriptionProvider.appleSpeech.rawValue:
             return try await transcribeWithAppleSpeech(fileURL: fileURL, locale: Locale(identifier: language ?? "en-US"))
         case "openai-whisper", TranscriptionProvider.openAIWhisper.rawValue, "whisper-1":
-            let key = apiKey ?? UserDefaults.standard.string(forKey: "openAIKey") ?? ""
+            let key = apiKey ?? KeychainStore.get("openAIKey") ?? ""
             return try await transcribeWithWhisper(fileURL: fileURL, apiKey: key, language: language)
         default:
             throw NSError(domain: "WisperVoice", code: -7, userInfo: [NSLocalizedDescriptionKey: "Unknown provider: \(providerId)"])

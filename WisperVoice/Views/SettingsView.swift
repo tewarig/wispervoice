@@ -1,27 +1,63 @@
 import SwiftUI
 import ServiceManagement
 
-struct SettingsView: View {
+// The app is ONE window: these panes mount in the main window's sidebar (ContentView).
+// The separate Settings scene / TabView container is intentionally gone — settings is
+// not a different part of the app, it's the app itself.
+//
+// Every pane uses the same scaffold: `Pane` (title + measured column) → `SectionLabel`
+// (uppercase tracked group heading) → `Card` (hairline surface) → `SettingRow` (label left,
+// control right). Raw `Form` gave all four screens the same undifferentiated look and let
+// controls drift far from their labels on a wide window.
+
+struct GeneralSettingsPane: View {
     @EnvironmentObject var dictation: DictationManager
     @EnvironmentObject var modelManager: ModelManager
     @State private var apiKeyVisible = false
+    /// nil = not checked yet; refreshed automatically whenever the key text settles.
+    @State private var keyCheck: APIKeyCheck?
+    @State private var isCheckingKey = false
     @AppStorage("launchAtLogin") private var launchAtLogin = false
     @AppStorage("showInDock") private var showInDock = true
-    @State private var showClipboard = false
+    // OpenAI-compatible cloud endpoint — read by TranscriptionService via CloudConfig.
+    @AppStorage(CloudConfig.baseURLKey) private var cloudBaseURL = "https://api.openai.com/v1"
+    @AppStorage(CloudConfig.sttModelKey) private var cloudSTTModel = "whisper-1"
+    @AppStorage(CloudConfig.polishModelKey) private var cloudPolishModel = "gpt-4o-mini"
+
+    /// Read by OverlayWindow.show() each time the pill is presented.
+    private var pillPosition: Binding<String> {
+        Binding(get: { UserDefaults.standard.string(forKey: "pill.position") ?? "bottom-center" },
+                set: { UserDefaults.standard.set($0, forKey: "pill.position") })
+    }
+
+    /// Engine changes route through selectSTT so the model resets to the new engine's first
+    /// ready model instead of pointing at the previous engine's.
+    private var engineSelection: Binding<String> {
+        Binding(get: { modelManager.selectedSTTProviderId },
+                set: { newId in
+                    let firstReady = modelManager.sttModels.first { $0.providerId == newId && ($0.isDownloaded || $0.sizeMB == 0) }?.id
+                    modelManager.selectSTT(providerId: newId, modelId: firstReady)
+                })
+    }
+
+    private var readyModels: [AIModel] {
+        modelManager.sttModels.filter {
+            $0.providerId == modelManager.selectedSTTProviderId && ($0.isDownloaded || $0.sizeMB == 0)
+        }
+    }
+
+    private var usesOpenAI: Bool {
+        modelManager.selectedSTTProviderId == "openai-whisper"
+            || dictation.providerRaw == TranscriptionProvider.openAIWhisper.rawValue
+    }
 
     var body: some View {
-        TabView {
-            generalTab
-                .tabItem { Label("General", systemImage: "gearshape.2") }
-            modelsTab
-                .tabItem { Label("Models", systemImage: "externaldrive") }
-            historyTab
-                .tabItem { Label("Clipboard", systemImage: "clock.arrow.circlepath") }
-            aboutTab
-                .tabItem { Label("About", systemImage: "info.circle") }
+        Pane(title: "Settings", subtitle: "How dictation behaves, and where it appears.") {
+            transcriptionSection
+            behaviorSection
+            shortcutSection
+            systemSection
         }
-        .frame(width: 580, height: 460)
-        .background(.ultraThinMaterial)
         .onChange(of: launchAtLogin) { _, new in
             do {
                 if new { try SMAppService.mainApp.register() }
@@ -33,302 +69,533 @@ struct SettingsView: View {
             if new { NSApp.activate(ignoringOtherApps: false) }
         }
     }
-    private var historyTab: some View {
-        ClipboardHistoryView()
-    }
 
-    private var generalTab: some View {
-        Form {
-            Section {
-                // Vercel AI SDK style provider picker — unified STT provider
-                Picker("STT Provider", selection: $modelManager.selectedSTTProviderId) {
-                    ForEach(AIProviderRegistry.shared.sttProviders, id: \.id) { p in
-                        Label { Text(p.displayName) } icon: { Image(systemName: p.isLocal ? "cpu" : "cloud.fill") }
-                            .tag(p.id)
-                    }
-                }.pickerStyle(.menu)
-                Picker("STT Model", selection: Binding(
-                    get: { modelManager.selectedSTTModelId ?? AIProviderRegistry.shared.provider(for: modelManager.selectedSTTProviderId)?.availableModels.first?.id },
-                    set: { modelManager.selectSTT(providerId: modelManager.selectedSTTProviderId, modelId: $0) }
-                )) {
-                    let models = AIProviderRegistry.shared.provider(for: modelManager.selectedSTTProviderId)?.availableModels ?? []
-                    ForEach(models, id: \.id) { m in Text(m.displayName).tag(Optional(m.id)) }
-                    Text("Default").tag(Optional<String>.none)
-                }.pickerStyle(.menu)
-                if let prov = AIProviderRegistry.shared.provider(for: modelManager.selectedSTTProviderId) {
-                    Text(prov.subtitle).font(.caption2).foregroundStyle(.secondary)
-                }
-                // Keep legacy picker for backward compat (hidden, sync shim)
-                Picker("Legacy Provider", selection: $dictation.providerRaw) {
-                    ForEach(TranscriptionProvider.allCases) { p in
-                        Label(p.rawValue, systemImage: p == .appleSpeech ? "cpu" : "cloud.fill").tag(p.rawValue)
-                    }
-                }.pickerStyle(.menu).hidden()
-                Picker("Language", selection: $dictation.languageCode) {
-                    Text("English (US)").tag("en-US"); Text("English (UK)").tag("en-GB")
-                    Text("Hindi").tag("hi-IN"); Text("Hinglish").tag("en-IN")
-                    Text("Spanish").tag("es-ES"); Text("French").tag("fr-FR")
-                    Text("German").tag("de-DE"); Text("Japanese").tag("ja-JP"); Text("Auto (Whisper)").tag("auto")
-                }
-                if modelManager.selectedSTTProviderId == "openai-whisper" || dictation.providerRaw == TranscriptionProvider.openAIWhisper.rawValue {
-                    LabeledContent("API Key") {
-                        HStack(spacing: 8) {
-                            Group {
-                                if apiKeyVisible { TextField("sk-…", text: $dictation.openAIKey) }
-                                else { SecureField("sk-…", text: $dictation.openAIKey) }
-                            }.textFieldStyle(.roundedBorder).frame(width: 220)
-                            Button(apiKeyVisible ? "Hide" : "Show") { withAnimation { apiKeyVisible.toggle() } }
-                                .buttonStyle(.bordered).controlSize(.small)
+    // MARK: Transcription
+
+    private var transcriptionSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SectionLabel("Transcription", systemImage: "waveform")
+            Card(padding: 0) {
+                VStack(spacing: 0) {
+                    row {
+                        SettingRow(
+                            title: "Engine",
+                            subtitle: modelManager.selectedSTTProviderId == "apple-speech"
+                                ? "Runs on-device and shows live text while you speak"
+                                : "Transcribes after you stop — live text is Apple Speech only",
+                            systemImage: "cpu"
+                        ) {
+                            Picker("", selection: engineSelection) {
+                                ForEach(AIProviderRegistry.shared.sttProviders, id: \.id) { p in
+                                    Text(p.displayName).tag(p.id)
+                                }
+                            }.labelsHidden().pickerStyle(.menu).frame(width: 190)
                         }
                     }
-                    Text("Stored locally. Create at platform.openai.com").font(.caption2).foregroundStyle(.secondary)
-                }
-            } header: { Label("Transcription", systemImage: "waveform").font(.callout.weight(.semibold)) }
-
-            Section {
-                Toggle(isOn: $dictation.autoPaste) {
-                    Label("Auto-paste at cursor", systemImage: "cursorarrow.click.2")
-                    Text("Accessibility → Clipboard fallback").font(.caption2).foregroundStyle(.secondary)
-                }
-                Toggle(isOn: $dictation.llmPolish) {
-                    Label("AI polish", systemImage: "sparkles")
-                    Text("Fixes grammar via gpt-4o-mini (needs key)").font(.caption2).foregroundStyle(.secondary)
-                }
-                Toggle(isOn: $dictation.autoStopAfterSilence) {
-                    Label("Auto-stop after silence", systemImage: "timer")
-                    Text("Ends recording after \(Int(dictation.autoStopSeconds))s silence (VAD)").font(.caption2).foregroundStyle(.secondary)
-                }
-                if dictation.autoStopAfterSilence {
-                    HStack {
-                        Text("Silence duration").font(.caption)
-                        Slider(value: $dictation.autoStopSeconds, in: 2...10, step: 1) { Text("Seconds") }
-                            .frame(width: 120)
-                        Text("\(Int(dictation.autoStopSeconds))s").font(.caption.monospacedDigit()).frame(width: 28)
-                    }
-                    HStack {
-                        Text("Sensitivity").font(.caption)
-                        Slider(value: $dictation.silenceThreshold, in: 0.04...0.20, step: 0.02)
-                            .frame(width: 120)
-                        Text(String(format: "%.2f", dictation.silenceThreshold)).font(.caption2.monospacedDigit()).frame(width: 36)
-                    }
-                }
-            } header: { Label("Behavior", systemImage: "slider.horizontal.3").font(.callout.weight(.semibold)) }
-
-            Section {
-                Picker("TTS Provider", selection: $modelManager.selectedTTSProviderId) {
-                    ForEach(AIProviderRegistry.shared.ttsProviders, id: \.id) { p in
-                        Label(p.displayName, systemImage: "speaker.wave.2").tag(p.id)
-                    }
-                }.pickerStyle(.menu)
-                Picker("TTS Voice/Model", selection: Binding(
-                    get: { modelManager.selectedTTSModelId ?? AIProviderRegistry.shared.provider(for: modelManager.selectedTTSProviderId)?.availableModels.first?.id },
-                    set: { modelManager.selectTTS(providerId: modelManager.selectedTTSProviderId, modelId: $0) }
-                )) {
-                    let models = AIProviderRegistry.shared.provider(for: modelManager.selectedTTSProviderId)?.availableModels ?? []
-                    ForEach(models, id: \.id) { m in Text(m.displayName).tag(Optional(m.id)) }
-                }.pickerStyle(.menu)
-                if let prov = AIProviderRegistry.shared.provider(for: modelManager.selectedTTSProviderId) {
-                    Text(prov.subtitle).font(.caption2).foregroundStyle(.secondary)
-                }
-            } header: { Label("Voice / TTS", systemImage: "speaker.wave.3.fill").font(.callout.weight(.semibold)) }
-
-            Section {
-                LabeledContent("Hotkey", value: "⌥ Space  •  Fn ×2").font(.callout)
-                Toggle(isOn: $launchAtLogin) {
-                    Label("Open at Login", systemImage: "power.circle")
-                    Text("Launches WisperVoice when you log in").font(.caption2).foregroundStyle(.secondary)
-                }
-                Toggle(isOn: $showInDock) {
-                    Label("Show in Dock", systemImage: "dock.rectangle")
-                    Text("Keep WisperVoice in Dock for quick access").font(.caption2).foregroundStyle(.secondary)
-                }
-                Text("Change hotkey in HotkeyManager.swift → keyCode / modifiers.").font(.caption2).foregroundStyle(.secondary)
-                HStack(spacing: 8) {
-                    Button("Reveal STT Folder") {
-                        NSWorkspace.shared.open(URL(fileURLWithPath: modelManager.modelsDirectoryPath))
-                    }.controlSize(.small)
-                    Button("Reveal TTS Folder") {
-                        NSWorkspace.shared.open(URL(fileURLWithPath: modelManager.ttsDirectoryPath))
-                    }.controlSize(.small)
-                }
-            } header: { Label("System", systemImage: "gearshape").font(.callout.weight(.semibold)) }
-        }
-        .formStyle(.grouped).scrollContentBackground(.hidden).padding(16)
-    }
-
-    private var modelsTab: some View {
-        ScrollView {
-            Form {
-                Section {
-                    Picker("STT Provider", selection: $modelManager.selectedSTTProviderId) {
-                        ForEach(AIProviderRegistry.shared.sttProviders, id: \.id) { p in Text(p.displayName).tag(p.id) }
-                    }.pickerStyle(.menu)
-                    Picker("Active Model", selection: Binding(
-                        get: { modelManager.selectedSTTModelId ?? AIProviderRegistry.shared.provider(for: modelManager.selectedSTTProviderId)?.availableModels.first?.id },
-                        set: { modelManager.selectSTT(providerId: modelManager.selectedSTTProviderId, modelId: $0) }
-                    )) {
-                        let ms = AIProviderRegistry.shared.provider(for: modelManager.selectedSTTProviderId)?.availableModels ?? []
-                        ForEach(ms, id: \.id) { m in Text(m.displayName).tag(Optional(m.id)) }
-                        Text("None").tag(Optional<String>.none)
-                    }.pickerStyle(.menu)
-                    Text("Vercel AI SDK style: `provider(model)` — switch provider+model without code changes.").font(.caption2).foregroundStyle(.secondary)
-                } header: { Label("STT Provider & Model", systemImage: "waveform.badge.mic").font(.callout.weight(.semibold)) }
-
-                Section {
-                    ForEach(modelManager.models) { m in
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(m.displayName).font(.callout.weight(.medium))
-                                Text(m.isDownloaded ? "Downloaded • \(m.localPath?.path ?? "")" : "\(m.sizeMB) MB • \(m.url.lastPathComponent)")
-                                    .font(.caption2).foregroundStyle(.secondary).lineLimit(1)
-                                if let prog = modelManager.downloadProgress[m.id], modelManager.isDownloading == m.id {
-                                    ProgressView(value: prog).controlSize(.mini).frame(width: 160)
-                                }
+                    RowDivider()
+                    row {
+                        SettingRow(
+                            title: "Model",
+                            subtitle: readyModels.isEmpty ? "Nothing downloaded yet — pick one in Models" : nil,
+                            systemImage: "shippingbox"
+                        ) {
+                            Picker("", selection: Binding(
+                                get: { modelManager.selectedSTTModelId ?? readyModels.first?.id },
+                                set: { modelManager.selectSTT(providerId: modelManager.selectedSTTProviderId, modelId: $0) }
+                            )) {
+                                ForEach(readyModels, id: \.id) { m in Text(m.displayName).tag(Optional(m.id)) }
+                                if readyModels.isEmpty { Text("None available").tag(Optional<String>.none) }
                             }
-                            Spacer()
-                            if m.isDownloaded {
-                                if modelManager.activeModelId == m.id {
-                                    Label("Active", systemImage: "checkmark.circle.fill").font(.caption.weight(.semibold)).foregroundStyle(Theme.accent)
-                                } else {
-                                    Button("Use") { modelManager.select(m.id) }.buttonStyle(.bordered).controlSize(.small)
-                                }
-                                Button(role: .destructive) { modelManager.delete(m) } label: { Image(systemName: "trash") }
-                                    .buttonStyle(.borderless)
-                            } else {
-                                if modelManager.isDownloading == m.id {
-                                    ProgressView().controlSize(.small)
-                                } else {
-                                    Button("Download") { modelManager.download(m) }.buttonStyle(.borderedProminent).controlSize(.small)
+                            .labelsHidden().pickerStyle(.menu).frame(width: 190)
+                            .disabled(readyModels.isEmpty)
+                        }
+                    }
+                    RowDivider()
+                    row {
+                        SettingRow(title: "Language", systemImage: "globe") {
+                            Picker("", selection: $dictation.languageCode) {
+                                Text("English (US)").tag("en-US")
+                                Text("English (UK)").tag("en-GB")
+                                Text("English (India)").tag("en-IN")
+                                Text("Hindi").tag("hi-IN")
+                                Text("Spanish").tag("es-ES")
+                                Text("French").tag("fr-FR")
+                                Text("German").tag("de-DE")
+                                Text("Japanese").tag("ja-JP")
+                                Text("Detect automatically").tag("auto")
+                            }.labelsHidden().pickerStyle(.menu).frame(width: 190)
+                        }
+                    }
+                    if usesOpenAI {
+                        RowDivider()
+                        row {
+                            SettingRow(
+                                title: "Server",
+                                subtitle: "Any OpenAI-compatible endpoint. Groq is ~9× cheaper than OpenAI; Mistral about half.",
+                                systemImage: "server.rack"
+                            ) {
+                                HStack(spacing: 8) {
+                                    TextField("https://api.openai.com/v1", text: $cloudBaseURL)
+                                        .textFieldStyle(.roundedBorder).frame(width: 230)
+                                    Menu("Preset") {
+                                        Button("OpenAI — whisper-1") { applyPreset("https://api.openai.com/v1", "whisper-1", "gpt-4o-mini") }
+                                        Button("Groq — whisper-large-v3-turbo (cheapest)") { applyPreset("https://api.groq.com/openai/v1", "whisper-large-v3-turbo", "llama-3.1-8b-instant") }
+                                        Button("Mistral — voxtral-mini") { applyPreset("https://api.mistral.ai/v1", "voxtral-mini-latest", "mistral-small-latest") }
+                                    }
+                                    .frame(width: 80)
                                 }
                             }
                         }
-                        .padding(.vertical, 4)
-                    }
-                } header: {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Label("Local Whisper Models (whisper.cpp) — legacy", systemImage: "externaldrive.connected.to.line.below")
-                            .font(.callout.weight(.semibold))
-                        Text("Kept for backward compat. New catalog below. Files in Application Support/WisperVoice/models.")
-                            .font(.caption2).foregroundStyle(.secondary)
-                    }
-                }
-
-                Section {
-                    ForEach(modelManager.sttModels.filter { $0.providerId != "apple-speech" && $0.providerId != "openai-whisper" }, id: \.id) { m in
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(m.displayName).font(.callout.weight(.medium))
-                                HStack(spacing: 4) {
-                                    Text(m.providerId).font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
-                                    Text("• \(m.sizeMB) MB • \(m.fileName)").font(.caption2).foregroundStyle(.secondary).lineLimit(1)
-                                }
-                                if m.isDownloaded { Text(m.localPath?.path ?? "Downloaded").font(.caption2).foregroundStyle(Theme.accent).lineLimit(1) }
-                                if let prog = modelManager.aiDownloadProgress[m.id], modelManager.aiDownloadingId == m.id {
-                                    ProgressView(value: prog).controlSize(.mini).frame(width: 160)
+                        RowDivider()
+                        row {
+                            SettingRow(title: "Transcription model", subtitle: "Model name the server expects", systemImage: "waveform") {
+                                TextField("whisper-1", text: $cloudSTTModel)
+                                    .textFieldStyle(.roundedBorder).frame(width: 190)
+                            }
+                        }
+                        RowDivider()
+                        row {
+                            SettingRow(title: "API key", subtitle: "Key for the server above — stored only on this Mac", systemImage: "key") {
+                                HStack(spacing: 8) {
+                                    Group {
+                                        if apiKeyVisible { TextField("sk-…", text: $dictation.openAIKey) }
+                                        else { SecureField("sk-…", text: $dictation.openAIKey) }
+                                    }.textFieldStyle(.roundedBorder).frame(width: 190)
+                                    Button(apiKeyVisible ? "Hide" : "Show") { withAnimation { apiKeyVisible.toggle() } }
+                                        .buttonStyle(.bordered)
                                 }
                             }
-                            Spacer()
-                            if m.isDownloaded {
-                                if modelManager.selectedSTTModelId == m.id {
-                                    Label("Active", systemImage: "checkmark.circle.fill").font(.caption.weight(.semibold)).foregroundStyle(Theme.accent)
-                                } else {
-                                    Button("Use") { modelManager.selectSTT(providerId: m.providerId, modelId: m.id) }.buttonStyle(.bordered).controlSize(.small)
-                                }
-                                Button(role: .destructive) { modelManager.delete(m) } label: { Image(systemName: "trash") }.buttonStyle(.borderless)
-                            } else {
-                                if modelManager.aiDownloadingId == m.id {
-                                    ProgressView().controlSize(.small)
-                                } else {
-                                    Button("Download") { modelManager.download(m) }.buttonStyle(.borderedProminent).controlSize(.small)
-                                }
-                            }
-                        }.padding(.vertical, 4)
+                        }
+                        RowDivider()
+                        row { keyStatusRow.padding(.vertical, 9) }
                     }
-                } header: {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Label("Open Whisper Variants (Whisper.cpp • Faster-Whisper • Parakeet)", systemImage: "cpu")
-                            .font(.callout.weight(.semibold))
-                        Text("Multi-provider STT — Vercel AI SDK abstraction. Switch via Settings without code change.").font(.caption2).foregroundStyle(.secondary)
-                    }
-                }
-
-                Section {
-                    ForEach(modelManager.ttsModels, id: \.id) { m in
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(m.displayName).font(.callout.weight(.medium))
-                                HStack(spacing: 4) {
-                                    Text(m.providerId).font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
-                                    Text("• \(m.sizeMB) MB • \(m.fileName)").font(.caption2).foregroundStyle(.secondary).lineLimit(1)
-                                }
-                                if m.isDownloaded { Text(m.localPath?.path ?? "Downloaded").font(.caption2).foregroundStyle(Theme.accent).lineLimit(1) }
-                                if let prog = modelManager.aiDownloadProgress[m.id], modelManager.aiDownloadingId == m.id {
-                                    ProgressView(value: prog).controlSize(.mini).frame(width: 160)
-                                    Text("Downloading \(Int((prog)*100))%").font(.caption2).foregroundStyle(.secondary)
-                                }
-                            }
-                            Spacer()
-                            if m.isDownloaded {
-                                if modelManager.selectedTTSModelId == m.id {
-                                    Label("Active", systemImage: "checkmark.circle.fill").font(.caption.weight(.semibold)).foregroundStyle(Theme.accent)
-                                } else {
-                                    Button("Use") { modelManager.selectTTS(providerId: m.providerId, modelId: m.id) }.buttonStyle(.bordered).controlSize(.small)
-                                }
-                                Button(role: .destructive) { modelManager.delete(m) } label: { Image(systemName: "trash") }.buttonStyle(.borderless)
-                            } else {
-                                if modelManager.aiDownloadingId == m.id {
-                                    ProgressView().controlSize(.small)
-                                } else {
-                                    Button("Download") { modelManager.download(m) }.buttonStyle(.borderedProminent).controlSize(.small)
-                                }
-                            }
-                        }.padding(.vertical, 4)
-                    }
-                } header: {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Label("Open Voice TTS Models (Piper • Coqui XTTS • Whisper-TTS)", systemImage: "speaker.wave.2.fill")
-                            .font(.callout.weight(.semibold))
-                        Text("Download open voice models — stubbed with progress (writes placeholder to Application Support/WisperVoice/tts). Replace stub with real Piper/Coqui engine.").font(.caption2).foregroundStyle(.secondary)
-                    }
-                }
-
-                Section {
-                    LabeledContent("Active STT", value: AIProviderRegistry.shared.model(for: modelManager.selectedSTTModelId ?? "")?.displayName ?? modelManager.activeModel?.displayName ?? "System default")
-                    LabeledContent("Active TTS", value: AIProviderRegistry.shared.model(for: modelManager.selectedTTSModelId ?? "")?.displayName ?? "None")
-                    Text("STT: when provider is Apple Speech model is unused. For local Whisper variants select a downloaded model. TTS stub plays placeholder.").font(.caption2).foregroundStyle(.secondary)
                 }
             }
-            .formStyle(.grouped).scrollContentBackground(.hidden).padding(16)
+            .task(id: dictation.openAIKey + "|" + cloudBaseURL) {
+                // Probe the key whenever it or the server settles — the debounce avoids
+                // hitting the API on every keystroke while pasting/typing.
+                guard usesOpenAI, !dictation.openAIKey.isEmpty else { keyCheck = nil; return }
+                try? await Task.sleep(nanoseconds: 800_000_000)
+                guard !Task.isCancelled else { return }
+                isCheckingKey = true
+                let verdict = await TranscriptionService.shared.validateOpenAIKey(dictation.openAIKey)
+                // A probe cancelled by further typing throws CancellationError inside the
+                // URLSession call, which reads as .unreachable — don't let the dead task
+                // flash a false "check your connection" over the replacement probe.
+                guard !Task.isCancelled else { return }
+                keyCheck = verdict
+                isCheckingKey = false
+            }
+            // Legacy provider binding kept in sync for the older transcription path.
+            Picker("", selection: $dictation.providerRaw) {
+                ForEach(TranscriptionProvider.allCases) { p in Text(p.rawValue).tag(p.rawValue) }
+            }.labelsHidden().pickerStyle(.menu).hidden().frame(height: 0)
         }
     }
 
-    private var aboutTab: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                GroupBox {
+    /// One-click server+models switch for known OpenAI-compatible providers.
+    private func applyPreset(_ url: String, _ sttModel: String, _ polishModel: String) {
+        cloudBaseURL = url
+        cloudSTTModel = sttModel
+        cloudPolishModel = polishModel
+    }
+
+    /// Live verdict on the entered key — verified against the API, not just non-empty.
+    @ViewBuilder
+    private var keyStatusRow: some View {
+        if dictation.openAIKey.isEmpty {
+            Label("This engine can't transcribe without an API key.", systemImage: "exclamationmark.triangle.fill")
+                .font(Theme.rowMeta).foregroundStyle(Theme.alert)
+        } else if isCheckingKey {
+            HStack(spacing: 7) {
+                ProgressView().controlSize(.small)
+                Text("Checking key…").font(Theme.rowMeta).foregroundStyle(.secondary)
+            }
+        } else {
+            switch keyCheck {
+            case .valid:
+                Label("Key verified — ready to transcribe.", systemImage: "checkmark.seal.fill")
+                    .font(Theme.rowMeta).foregroundStyle(Theme.violetAccent)
+            case .invalid:
+                Label("OpenAI rejected this key — check it and try again.", systemImage: "xmark.octagon.fill")
+                    .font(Theme.rowMeta).foregroundStyle(Theme.alert)
+            case .unreachable:
+                Label("Couldn't reach OpenAI to verify — check your connection.", systemImage: "wifi.exclamationmark")
+                    .font(Theme.rowMeta).foregroundStyle(.secondary)
+            case nil:
+                EmptyView()
+            }
+        }
+    }
+
+    // MARK: Behavior
+
+    private var behaviorSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SectionLabel("Behavior", systemImage: "slider.horizontal.3")
+            Card(padding: 0) {
+                VStack(spacing: 0) {
+                    row {
+                        SettingRow(title: "Type at cursor", subtitle: "Insert the transcript into whatever app is focused", systemImage: "cursorarrow.click.2") {
+                            Toggle("", isOn: $dictation.autoPaste).labelsHidden().toggleStyle(.switch)
+                        }
+                    }
+                    RowDivider()
+                    row {
+                        SettingRow(title: "Type as you pause", subtitle: "Words appear mid-dictation instead of all at the end (Apple Speech)", systemImage: "keyboard.badge.waveform") {
+                            Toggle("", isOn: $dictation.liveTyping).labelsHidden().toggleStyle(.switch)
+                        }
+                    }
+                    RowDivider()
+                    row {
+                        SettingRow(title: "Clean up grammar", subtitle: "Polishes the transcript with an AI model — uses your cloud server and key", systemImage: "sparkles") {
+                            Toggle("", isOn: $dictation.llmPolish).labelsHidden().toggleStyle(.switch)
+                        }
+                    }
+                    if dictation.llmPolish {
+                        RowDivider()
+                        row {
+                            SettingRow(title: "Polish model", subtitle: "Chat model on the same server — cheap ones work fine here", systemImage: "text.badge.checkmark") {
+                                TextField("gpt-4o-mini", text: $cloudPolishModel)
+                                    .textFieldStyle(.roundedBorder).frame(width: 190)
+                            }
+                        }
+                    }
+                    RowDivider()
+                    row {
+                        SettingRow(title: "Pill position", subtitle: "Where the floating dictation pill appears", systemImage: "rectangle.bottomthird.inset.filled") {
+                            Picker("", selection: pillPosition) {
+                                Text("Bottom Center").tag("bottom-center")
+                                Text("Bottom Left").tag("bottom-left")
+                                Text("Bottom Right").tag("bottom-right")
+                                Text("Top Center").tag("top-center")
+                                Text("Top Left").tag("top-left")
+                                Text("Top Right").tag("top-right")
+                            }.labelsHidden().pickerStyle(.menu).frame(width: 190)
+                        }
+                    }
+                    RowDivider()
+                    row {
+                        SettingRow(title: "Stop after silence", subtitle: "Ends the recording once you stop talking", systemImage: "timer") {
+                            Toggle("", isOn: $dictation.autoStopAfterSilence).labelsHidden().toggleStyle(.switch)
+                        }
+                    }
+                    if dictation.autoStopAfterSilence {
+                        RowDivider()
+                        row {
+                            sliderRow(
+                                title: "Silence before stopping",
+                                value: "\(Int(dictation.autoStopSeconds))s",
+                                binding: $dictation.autoStopSeconds, range: 2...10, step: 1
+                            )
+                        }
+                        RowDivider()
+                        row {
+                            sliderRow(
+                                title: "Microphone sensitivity",
+                                value: String(format: "%.2f", dictation.silenceThreshold),
+                                binding: $dictation.silenceThreshold, range: 0.04...0.20, step: 0.02
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func sliderRow(title: String, value: String, binding: Binding<Double>, range: ClosedRange<Double>, step: Double) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack {
+                Text(title).font(Theme.rowTitle)
+                Spacer()
+                Text(value).font(Theme.numeral).foregroundStyle(.secondary)
+            }
+            Slider(value: binding, in: range, step: step)
+        }
+        .padding(.vertical, 9)
+    }
+
+    // MARK: Shortcut
+
+    private var shortcutSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SectionLabel("Shortcut", systemImage: "keyboard")
+            Card {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Press this anywhere to start or stop dictating. Double-tapping Fn always works too.")
+                        .font(Theme.rowMeta).foregroundStyle(.secondary)
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 4), spacing: 8) {
+                        ForEach(HotkeyManager.presets) { preset in
+                            let selected = HotkeyManager.currentPreset.id == preset.id
+                            Button { dictation.applyHotkeyPreset(preset.id) } label: {
+                                Text(preset.label)
+                                    .font(.system(size: 12.5, weight: .medium, design: .rounded))
+                                    .frame(maxWidth: .infinity).padding(.vertical, 9)
+                                    .background(
+                                        selected ? Theme.violetAccent.opacity(0.16) : Theme.wellFill,
+                                        in: RoundedRectangle(cornerRadius: Theme.radiusControl, style: .continuous)
+                                    )
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: Theme.radiusControl, style: .continuous)
+                                            .stroke(selected ? Theme.violetAccent.opacity(0.55) : Theme.border, lineWidth: 1)
+                                    )
+                                    .foregroundStyle(selected ? Theme.violetAccent : .primary)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: System
+
+    private var systemSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SectionLabel("System", systemImage: "gearshape")
+            Card(padding: 0) {
+                VStack(spacing: 0) {
+                    row {
+                        SettingRow(title: "Open at login", subtitle: "Start WisperVoice when you log in", systemImage: "power") {
+                            Toggle("", isOn: $launchAtLogin).labelsHidden().toggleStyle(.switch)
+                        }
+                    }
+                    RowDivider()
+                    row {
+                        SettingRow(title: "Show in Dock", subtitle: "Turn off to run from the menu bar only", systemImage: "dock.rectangle") {
+                            Toggle("", isOn: $showInDock).labelsHidden().toggleStyle(.switch)
+                        }
+                    }
+                    RowDivider()
+                    row {
+                        SettingRow(title: "Downloaded files", subtitle: "Models are stored in Application Support", systemImage: "folder") {
+                            HStack(spacing: 8) {
+                                Button("Models") { NSWorkspace.shared.open(URL(fileURLWithPath: modelManager.modelsDirectoryPath)) }
+                                    .buttonStyle(.bordered)
+                                Button("Voices") { NSWorkspace.shared.open(URL(fileURLWithPath: modelManager.ttsDirectoryPath)) }
+                                    .buttonStyle(.bordered)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Consistent horizontal inset for rows inside a zero-padding card.
+    private func row<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        content().padding(.horizontal, 16)
+    }
+}
+
+
+/// Models — one list, grouped by engine. Previously the same whisper.cpp models appeared
+/// in two sections (a "legacy" list and the catalog), so the screen showed "Tiny — Active"
+/// twice and contradicted itself. The catalog is a superset, so it is the only list now.
+struct ModelsPane: View {
+    @EnvironmentObject var modelManager: ModelManager
+
+    /// Switching engine also resets the model — a stale id from the previous engine left
+    /// the model picker rendering blank.
+    private var engineSelection: Binding<String> {
+        Binding(get: { modelManager.selectedSTTProviderId },
+                set: { newId in
+                    let firstReady = modelManager.sttModels.first { $0.providerId == newId && ($0.isDownloaded || $0.sizeMB == 0) }?.id
+                    modelManager.selectSTT(providerId: newId, modelId: firstReady)
+                })
+    }
+
+    var body: some View {
+        Pane(title: "Models", subtitle: "Choose the engine that turns your speech into text.") {
+            SectionLabel("Active engine", systemImage: "waveform.badge.mic")
+            Card {
+                VStack(spacing: 0) {
+                    SettingRow(title: "Engine", subtitle: engineSubtitle) {
+                        Picker("", selection: engineSelection) {
+                            ForEach(AIProviderRegistry.shared.sttProviders, id: \.id) { p in
+                                Text(p.displayName).tag(p.id)
+                            }
+                        }
+                        .labelsHidden().pickerStyle(.menu).frame(width: 200)
+                    }
+                    RowDivider()
+                    SettingRow(title: "Model", subtitle: readyModels.isEmpty ? "Download one below to use this engine" : nil) {
+                        Picker("", selection: Binding(
+                            get: { modelManager.selectedSTTModelId ?? readyModels.first?.id },
+                            set: { modelManager.selectSTT(providerId: modelManager.selectedSTTProviderId, modelId: $0) }
+                        )) {
+                            ForEach(readyModels, id: \.id) { m in Text(m.displayName).tag(Optional(m.id)) }
+                            if readyModels.isEmpty { Text("None available").tag(Optional<String>.none) }
+                        }
+                        .labelsHidden().pickerStyle(.menu).frame(width: 200)
+                        .disabled(readyModels.isEmpty)
+                    }
+                }
+            }
+
+            ForEach(AIProviderRegistry.shared.sttProviders, id: \.id) { provider in
+                let models = modelManager.sttModels.filter { $0.providerId == provider.id }
+                if !models.isEmpty {
                     VStack(alignment: .leading, spacing: 10) {
-                        Label("How to use — like Wispr Flow", systemImage: "play.circle.fill").font(.headline)
-                        VStack(alignment: .leading, spacing: 8) {
-                            Label("Press ⌥Space or Fn×2 to start", systemImage: "mic.circle.fill")
-                            Label("See bubble — live text + waveform + × to cancel", systemImage: "capsule.portrait.fill")
-                            Label("Press again → transcribes → pastes at cursor", systemImage: "text.cursor")
-                            Label("Works everywhere: Slack, Notion, Xcode, Gmail", systemImage: "macwindow.on.rectangle")
-                        }.font(.callout).foregroundStyle(.secondary)
-                    }.padding(4)
-                }
-                GroupBox {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Label("Wispr Flow parity", systemImage: "checkmark.seal.fill").font(.subheadline.weight(.semibold))
-                        Text("• System-wide dictation  • Floating pill with live text  • Auto-edits  • 100+ languages  • Clipboard fallback  • History  • Offline Apple + Cloud Whisper + Local models").font(.caption).foregroundStyle(.secondary)
+                        SectionLabel(provider.displayName, systemImage: provider.isLocal ? "cpu" : "cloud")
+                        Text(provider.subtitle).font(Theme.rowMeta).foregroundStyle(.secondary).padding(.leading, 2)
+                        Card(padding: 0) {
+                            VStack(spacing: 0) {
+                                ForEach(Array(models.enumerated()), id: \.element.id) { index, model in
+                                    if index > 0 { RowDivider() }
+                                    modelRow(model)
+                                }
+                            }
+                        }
                     }
                 }
-                GroupBox {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Label("Privacy", systemImage: "lock.shield.fill").font(.subheadline.weight(.semibold))
-                        Text("Apple Speech on-device. Whisper API only if you pick it. Local models stay on Mac. No analytics.").font(.caption).foregroundStyle(.secondary)
+            }
+
+            VStack(alignment: .leading, spacing: 10) {
+                SectionLabel("Voices", systemImage: "speaker.wave.2")
+                Text("Text-to-speech is in preview — downloads reserve the model slot while the speech engine is being built.")
+                    .font(Theme.rowMeta).foregroundStyle(.secondary).padding(.leading, 2)
+                Card(padding: 0) {
+                    VStack(spacing: 0) {
+                        ForEach(Array(modelManager.ttsModels.enumerated()), id: \.element.id) { index, model in
+                            if index > 0 { RowDivider() }
+                            modelRow(model, isTTS: true)
+                        }
                     }
                 }
-            }.padding(16)
-        }.background(Color(nsColor: .windowBackgroundColor).opacity(0.6))
+            }
+        }
+    }
+
+    private var readyModels: [AIModel] {
+        modelManager.sttModels.filter {
+            $0.providerId == modelManager.selectedSTTProviderId && ($0.isDownloaded || $0.sizeMB == 0)
+        }
+    }
+
+    private var engineSubtitle: String {
+        if modelManager.selectedSTTProviderId == "openai-whisper",
+           (KeychainStore.get("openAIKey") ?? "").isEmpty {
+            return "Needs an API key — add it in Settings before this engine can transcribe"
+        }
+        return modelManager.selectedSTTProviderId == "apple-speech"
+            ? "Shows live text while you speak"
+            : "Transcribes after you stop — live preview is Apple Speech only"
+    }
+
+    @ViewBuilder
+    private func modelRow(_ model: AIModel, isTTS: Bool = false) -> some View {
+        let isActive = isTTS
+            ? modelManager.selectedTTSModelId == model.id
+            : modelManager.selectedSTTModelId == model.id
+        let isDownloading = modelManager.aiDownloadingId == model.id
+        let progress = modelManager.aiDownloadProgress[model.id]
+        let builtIn = model.sizeMB == 0
+
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 8) {
+                    Text(model.displayName).font(Theme.rowTitle)
+                    if isActive {
+                        Text("ACTIVE")
+                            .font(.system(size: 9, weight: .bold)).tracking(0.6)
+                            .padding(.horizontal, 6).padding(.vertical, 2)
+                            .background(Theme.violetAccent.opacity(0.16), in: Capsule())
+                            .foregroundStyle(Theme.violetAccent)
+                    }
+                }
+                Text(model.description).font(Theme.rowMeta).foregroundStyle(.secondary).lineLimit(1)
+                if isDownloading, let progress {
+                    ProgressView(value: progress).controlSize(.small).frame(width: 200)
+                }
+            }
+            Spacer(minLength: 12)
+            Text(builtIn ? "Built in" : "\(model.sizeMB) MB")
+                .font(Theme.numeral).foregroundStyle(.secondary)
+            if builtIn || model.isDownloaded {
+                if !isActive {
+                    Button("Use") {
+                        if isTTS { modelManager.selectTTS(providerId: model.providerId, modelId: model.id) }
+                        else { modelManager.selectSTT(providerId: model.providerId, modelId: model.id) }
+                    }.buttonStyle(.bordered)
+                }
+                if !builtIn {
+                    Button { modelManager.delete(model) } label: { Image(systemName: "trash") }
+                        .buttonStyle(.borderless).foregroundStyle(.secondary)
+                        .help("Remove downloaded model")
+                }
+            } else if isDownloading {
+                ProgressView().controlSize(.small)
+            } else {
+                Button("Download") { modelManager.download(model) }.buttonStyle(.borderedProminent)
+            }
+        }
+        .padding(.horizontal, 16).padding(.vertical, 12)
+    }
+}
+
+struct AboutPane: View {
+    private var build: String {
+        let name = Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String ?? "WisperVoice"
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0"
+        let number = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?"
+        return "\(name) · \(version) (build \(number))"
+    }
+
+    var body: some View {
+        Pane(title: "About", subtitle: "Speak anywhere on your Mac and the words land at your cursor.") {
+            SectionLabel("How it works", systemImage: "play.circle")
+            Card(padding: 0) {
+                VStack(spacing: 0) {
+                    step(1, "Press \(HotkeyManager.currentPreset.label)", "Start dictating from any app — no window to focus first.")
+                    RowDivider()
+                    step(2, "Speak naturally", "The pill shows a live transcript and a waveform while you talk.")
+                    RowDivider()
+                    step(3, "Pause or press again", "Your words are typed at the cursor, or copied if pasting isn't available.")
+                }
+            }
+
+            SectionLabel("Privacy", systemImage: "lock.shield")
+            Card {
+                VStack(alignment: .leading, spacing: 8) {
+                    bullet("Apple Speech runs on-device — your audio never leaves your Mac.")
+                    bullet("Downloaded Whisper models also run entirely locally.")
+                    bullet("Cloud transcription is used only if you choose it and add your own API key.")
+                    bullet("No analytics, no tracking, no accounts.")
+                }
+            }
+
+            SectionLabel("Version", systemImage: "number")
+            Card {
+                Text(build).font(Theme.numeral).foregroundStyle(.secondary).textSelection(.enabled)
+            }
+        }
+    }
+
+    private func step(_ n: Int, _ title: String, _ detail: String) -> some View {
+        HStack(alignment: .top, spacing: 14) {
+            Text("\(n)")
+                .font(.system(size: 12, weight: .bold, design: .rounded))
+                .frame(width: 24, height: 24)
+                .background(Theme.violetAccent.opacity(0.14), in: Circle())
+                .foregroundStyle(Theme.violetAccent)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title).font(Theme.rowTitle)
+                Text(detail).font(Theme.rowMeta).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 16).padding(.vertical, 13)
+    }
+
+    private func bullet(_ text: String) -> some View {
+        HStack(alignment: .top, spacing: 9) {
+            Circle().fill(Theme.violetAccent.opacity(0.5)).frame(width: 4, height: 4).padding(.top, 6)
+            Text(text).font(.system(size: 12.5)).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
     }
 }

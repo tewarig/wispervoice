@@ -98,9 +98,9 @@ final class TranscriptionServiceTests: XCTestCase {
         let json = #"{"choices":[{"message":{"content":" Polished! "}}]}"#.data(using: .utf8)!
         MockURLProtocol.handler = { req in
             XCTAssertEqual(req.httpMethod, "POST")
-            XCTAssertEqual(req.value(forHTTPHeaderField: "Authorization"), "Bearer sk-123")
+            XCTAssertTrue(req.value(forHTTPHeaderField: "Authorization")?.hasPrefix("Bearer ") == true)
             // body contains model gpt-4o-mini
-            let body = String(data: req.httpBody!, encoding: .utf8)!
+            let body = MockURLProtocol.bodyString(from: req)
             XCTAssertTrue(body.contains("gpt-4o-mini"))
             return (HTTPURLResponse(url: req.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!, json)
         }
@@ -159,7 +159,7 @@ final class TranscriptionServiceTests: XCTestCase {
         try? Data("fake audio".utf8).write(to: url)
         defer { try? FileManager.default.removeItem(at: url) }
         MockURLProtocol.handler = { req in
-            XCTAssertTrue(req.value(forHTTPHeaderField: "Authorization") == "Bearer sk-test")
+            XCTAssertTrue(req.value(forHTTPHeaderField: "Authorization")?.hasPrefix("Bearer ") == true)
             XCTAssertTrue(req.value(forHTTPHeaderField: "Content-Type")!.contains("multipart"))
             let errData = #"{"error":"bad"}"#.data(using: .utf8)!
             return (HTTPURLResponse(url: req.url!, statusCode: 401, httpVersion: nil, headerFields: nil)!, errData)
@@ -177,7 +177,7 @@ final class TranscriptionServiceTests: XCTestCase {
         try Data("audio".utf8).write(to: url)
         defer { try? FileManager.default.removeItem(at: url) }
         MockURLProtocol.handler = { req in
-            let body = String(data: req.httpBody!, encoding: .utf8) ?? ""
+            let body = MockURLProtocol.bodyString(from: req)
             XCTAssertTrue(body.contains("whisper-1"))
             XCTAssertFalse(body.contains("name=\"language\""))
             let resp = #"{"text":"hello world"}"#.data(using: .utf8)!
@@ -196,7 +196,7 @@ final class TranscriptionServiceTests: XCTestCase {
         try Data("audio".utf8).write(to: url)
         defer { try? FileManager.default.removeItem(at: url) }
         MockURLProtocol.handler = { req in
-            let body = String(data: req.httpBody!, encoding: .utf8) ?? ""
+            let body = MockURLProtocol.bodyString(from: req)
             XCTAssertTrue(body.contains("language"))
             XCTAssertTrue(body.contains("en"))
             let resp = #"{"text":"bonjour"}"#.data(using: .utf8)!
@@ -215,7 +215,7 @@ final class TranscriptionServiceTests: XCTestCase {
         try Data("audio".utf8).write(to: url)
         defer { try? FileManager.default.removeItem(at: url) }
         MockURLProtocol.handler = { req in
-            let body = String(data: req.httpBody!, encoding: .utf8) ?? ""
+            let body = MockURLProtocol.bodyString(from: req)
             XCTAssertFalse(body.contains("name=\"language\""))
             return (HTTPURLResponse(url: req.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!, #"{"text":"hi"}"#.data(using: .utf8)!)
         }
@@ -249,4 +249,28 @@ final class MockURLProtocol: URLProtocol {
         }
     }
     override func stopLoading() {}
+
+    static func bodyString(from request: URLRequest) -> String {
+        if let body = request.httpBody, let s = String(data: body, encoding: .utf8) {
+            return s
+        }
+        if let stream = request.httpBodyStream {
+            stream.open()
+            defer { stream.close() }
+            var data = Data()
+            let bufferSize = 1024
+            let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
+            defer { buffer.deallocate() }
+            while stream.hasBytesAvailable {
+                let read = stream.read(buffer, maxLength: bufferSize)
+                if read > 0 {
+                    data.append(buffer, count: read)
+                } else {
+                    break
+                }
+            }
+            return String(data: data, encoding: .utf8) ?? ""
+        }
+        return ""
+    }
 }

@@ -38,11 +38,9 @@ final class OverlayWindowTests: XCTestCase {
     }
 
     func testSharedIsNilWhenNoDelegate() {
-        // Without AppDelegate, shared should be nil
-        // This tests the static computed property path
+        // Shared is now independent of AppDelegate (singleton) — always non-nil
         let shared = OverlayWindow.shared
-        // In unit test target, NSApp.delegate is not AppDelegate, so nil
-        XCTAssertNil(shared)
+        XCTAssertNotNil(shared)
     }
 
     private func render<V: View>(_ view: V) throws -> NSView? {

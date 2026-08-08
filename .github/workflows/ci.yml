@@ -65,6 +65,7 @@ jobs:
 
       - name: Test with coverage
         run: |
+          rm -rf TestResults.xcresult
           set -o pipefail
           xcodebuild test \
             -project WisperVoice.xcodeproj \
@@ -74,14 +75,14 @@ jobs:
             -enableCodeCoverage YES \
             -resultBundlePath TestResults.xcresult \
             CODE_SIGNING_ALLOWED=NO \
-            | xcpretty --color || xcodebuild test \
+            | xcpretty --color || { rm -rf TestResults.xcresult; xcodebuild test \
             -project WisperVoice.xcodeproj \
             -scheme WisperVoice \
             -configuration Debug \
             -destination 'platform=macOS' \
             -enableCodeCoverage YES \
             -resultBundlePath TestResults.xcresult \
-            CODE_SIGNING_ALLOWED=NO
+            CODE_SIGNING_ALLOWED=NO; }
 
       - name: Generate coverage report
         if: always()
