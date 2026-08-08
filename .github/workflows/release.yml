@@ -199,14 +199,25 @@ jobs:
           shasum -a 256 *.dmg 2>/dev/null | tee -a checksums.txt || true
 
       - name: Generate release notes
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          TAG="${{ steps.version.outputs.tag }}"
           PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
           echo "Previous tag: ${PREV_TAG:-none}"
+          # The user-facing story comes from CHANGELOG.md's "## [X.Y.Z]" section —
+          # that file is the release's changeset. Commit list is only the fallback
+          # when a release was tagged without a changelog entry.
+          CHANGELOG_SECTION=$(awk -v ver="[${VERSION}]" '
+            index($0, "## ") == 1 { if (found) exit; if (index($0, ver) > 0) { found = 1; next } }
+            found' CHANGELOG.md 2>/dev/null || true)
           {
             echo "## WisperVoice ${TAG}"
             echo ""
-            if [ -n "$PREV_TAG" ]; then
+            if [ -n "$CHANGELOG_SECTION" ]; then
+              echo "$CHANGELOG_SECTION"
+              echo ""
+            elif [ -n "$PREV_TAG" ]; then
               echo "### Changes since ${PREV_TAG}"
               git log "${PREV_TAG}..HEAD" --pretty=format:"- %s (%h)" --no-merges | head -n 100
               echo ""
