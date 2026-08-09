@@ -46,10 +46,15 @@ final class AudioRecorder: NSObject {
             throw NSError(domain: "WisperVoice", code: -1, userInfo: [NSLocalizedDescriptionKey: "No audio input format"])
         }
 
+        // The file MUST use the tap's sample rate and channel count: AVAudioFile.write(from:)
+        // throws when the buffer format differs from the file's processing format, and the
+        // tap below delivers buffers in the hardware input format (typically 44.1/48 kHz).
+        // A fixed 16 kHz file here meant every write failed silently and the WAV stayed
+        // empty — breaking all file-based transcription (cloud Whisper, local engines).
         let file = try AVAudioFile(forWriting: url, settings: [
             AVFormatIDKey: kAudioFormatLinearPCM,
-            AVSampleRateKey: 16000,
-            AVNumberOfChannelsKey: 1,
+            AVSampleRateKey: format.sampleRate,
+            AVNumberOfChannelsKey: format.channelCount,
             AVLinearPCMBitDepthKey: 16,
             AVLinearPCMIsFloatKey: false,
             AVLinearPCMIsBigEndianKey: false

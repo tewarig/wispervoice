@@ -173,7 +173,9 @@ struct ContentView: View {
             .frame(height: 190)
         }
         .buttonStyle(.plain)
-        .keyboardShortcut(.space, modifiers: .option)
+        // No hardcoded ⌥Space key equivalent here: the user's chosen preset (Carbon
+        // hotkey) already works while the app is frontmost, and a fixed ⌥Space kept
+        // toggling recording in-app even after the shortcut was rebound.
         .animation(Theme.motion, value: dictation.state)
     }
 
@@ -221,14 +223,21 @@ struct ContentView: View {
         Card(padding: 18) {
             HStack(spacing: 0) {
                 StatTile(figure: "\(history.items.count)", caption: "Dictations")
-                RowDivider().frame(width: 1, height: 34)
+                statDivider
                 StatTile(figure: "\(todayCount)", caption: "Today")
-                RowDivider().frame(width: 1, height: 34)
+                statDivider
                 StatTile(figure: "\(wordCount)", caption: "Words")
-                RowDivider().frame(width: 1, height: 34)
+                statDivider
                 StatTile(figure: minutesLabel, caption: "Minutes")
             }
         }
+    }
+
+    /// Vertical rule between stat tiles. RowDivider can't be re-framed for this — its own
+    /// body pins height to 1pt, so `RowDivider().frame(width: 1, height: 34)` rendered a
+    /// 1×1 speck instead of a rule.
+    private var statDivider: some View {
+        Rectangle().fill(Theme.border).frame(width: 1, height: 34)
     }
 
     private var todayCount: Int {

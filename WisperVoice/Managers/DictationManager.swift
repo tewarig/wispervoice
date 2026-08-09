@@ -27,8 +27,16 @@ final class DictationManager: ObservableObject {
 
     @AppStorage("provider") var providerRaw: String = TranscriptionProvider.appleSpeech.rawValue
     /// Keychain-backed (encrypted), not @AppStorage — UserDefaults is a plaintext plist.
+    /// `didSet` fires for @Published properties during `init` too, so loading the stored
+    /// value must not write back: a transient Keychain read failure (locked keychain at
+    /// login, errSecInteractionNotAllowed) would otherwise assign "" and DELETE the real key.
+    /// Only user edits reach the Keychain.
+    private var isHydratingKey = false
     @Published var openAIKey: String = "" {
-        didSet { KeychainStore.set(openAIKey, account: "openAIKey") }
+        didSet {
+            guard !isHydratingKey else { return }
+            KeychainStore.set(openAIKey, account: "openAIKey")
+        }
     }
     @AppStorage("languageCode") var languageCode: String = "en-US"
     @AppStorage("autoPaste") var autoPaste: Bool = true
@@ -52,7 +60,10 @@ final class DictationManager: ObservableObject {
     /// must key off this, NOT the legacy `provider`, which stays `.appleSpeech` even after
     /// the user switches to Whisper in Settings.
     var usesAppleSpeech: Bool {
-        (UserDefaults.standard.string(forKey: AISettingsKeys.sttProvider) ?? provider.aiProviderId) == "apple-speech"
+        // One resolver for the whole app: UserDefaults.sttProviderId already handles the
+        // ai.stt.provider → ai.sttProvider → legacy "provider" fallback chain. Hand-rolled
+        // fallbacks here vs. PermissionsManager/OverlayView diverged for legacy users.
+        UserDefaults.standard.sttProviderId == "apple-speech"
     }
 
     private let recorder = AudioRecorder()
@@ -75,13 +86,18 @@ final class DictationManager: ObservableObject {
     private var targetApp: NSRunningApplication?
     /// When the current recording started — feeds the minutes-dictated stat.
     private var recordingStartedAt: Date?
+    /// Invalidates overlay-dismiss timers from PREVIOUS dictations: a stale 8s grace timer
+    /// must not hide the pill while it is showing the next dictation's result.
+    private var dismissToken = 0
 
     init() {
         // Legacy-domain import must land BEFORE the key is read, or an upgrading user's
         // key exists but openAIKey stays empty until the next relaunch. Self-guarded.
         LegacyDefaults.migrateOnce()
         KeychainStore.migrate(defaultsKey: "openAIKey", account: "openAIKey")
+        isHydratingKey = true
         openAIKey = KeychainStore.get("openAIKey") ?? ""
+        isHydratingKey = false
         hotkeyManager.onHotkeyPressed = { [weak self] in
             Task { @MainActor in self?.toggleDictation() }
         }
@@ -109,7 +125,7 @@ final class DictationManager: ObservableObject {
         errorMessage = nil
         // Fail fast: recording with a key-less cloud engine would only error after the
         // user finished speaking — worse than refusing up front with a clear reason.
-        let effectiveProvider = UserDefaults.standard.string(forKey: AISettingsKeys.sttProvider) ?? provider.aiProviderId
+        let effectiveProvider = UserDefaults.standard.sttProviderId
         if effectiveProvider == "openai-whisper", openAIKey.isEmpty {
             errorMessage = "OpenAI Whisper needs an API key — add it in Settings, or switch to Apple Speech."
             NSSound(named: "Basso")?.play()
@@ -186,8 +202,18 @@ final class DictationManager: ObservableObject {
             if autoPaste, !remainder.isEmpty {
                 state = .injecting
                 updateOverlay()
-                TextInjector.inject(text: remainder, target: targetApp)
-                NSSound(named: "Glass")?.play()
+                Task {
+                    // Same 250 ms settle the normal path uses: the stop hotkey's modifiers
+                    // can still be physically held, which would corrupt the synthetic ⌘V
+                    // fallback if we inject in the same tick.
+                    try? await Task.sleep(nanoseconds: 250_000_000)
+                    TextInjector.inject(text: remainder, target: targetApp)
+                    NSSound(named: "Glass")?.play()
+                    state = .idle
+                    updateOverlay()
+                    scheduleOverlayDismiss()
+                }
+                return
             }
             state = .idle
             updateOverlay()
@@ -203,7 +229,7 @@ final class DictationManager: ObservableObject {
                     raw = fallbackLive
                 } else {
                     // Vercel AI SDK style: unified provider dispatch via ModelManager selection
-                    let sttProvider = UserDefaults.standard.string(forKey: AISettingsKeys.sttProvider) ?? provider.aiProviderId
+                    let sttProvider = UserDefaults.standard.sttProviderId
                     let sttModel = UserDefaults.standard.string(forKey: AISettingsKeys.sttModel)
                     // If ModelManager selection differs from legacy provider, prefer unified path
                     if AIProviderRegistry.shared.provider(for: sttProvider) != nil {
@@ -257,8 +283,10 @@ final class DictationManager: ObservableObject {
     private func scheduleOverlayDismiss() {
         let inserted = autoPaste && targetApp != nil && AXIsProcessTrusted()
         let delay: TimeInterval = inserted ? 1.2 : 8
+        dismissToken &+= 1
+        let token = dismissToken
         DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
-            guard let self, self.state == .idle else { return } // a new recording owns the pill now
+            guard let self, self.dismissToken == token, self.state == .idle else { return } // a newer dictation owns the pill now
             self.hideOverlay()
         }
     }
@@ -314,7 +342,10 @@ final class DictationManager: ObservableObject {
             self.speechTask = recognizer.recognitionTask(with: request) { [weak self] result, error in
                 guard let self else { return }
                 Task { @MainActor in
-                    if let result = result {
+                    if let result = result, self.state == .recording {
+                        // The state guard matters: a partial queued around cancel/stop would
+                        // otherwise re-present the pill after hideOverlay() — and supersede
+                        // the hide fade's token — leaving it stranded with no dismissal.
                         self.liveTranscript = result.bestTranscription.formattedString
                         self.showOverlay() // update pill with live text
                     }

@@ -175,13 +175,15 @@ private struct EnginePickerRow: View {
 /// Shortcut preset picker — applies immediately via the live hotkey manager.
 private struct ShortcutPickerRow: View {
     @ObservedObject private var dictation = DictationManager.shared
-    @State private var selectedId = HotkeyManager.currentPreset.id
 
     var body: some View {
         LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 4), spacing: 8) {
             ForEach(HotkeyManager.presets) { preset in
+                // Selection is derived, not shadowed in @State: applyHotkeyPreset's
+                // objectWillChange re-renders this grid, and a change made elsewhere
+                // (Settings pane) stays reflected here.
+                let selected = HotkeyManager.currentPreset.id == preset.id
                 Button {
-                    selectedId = preset.id
                     dictation.applyHotkeyPreset(preset.id)
                 } label: {
                     Text(preset.label)
@@ -189,12 +191,12 @@ private struct ShortcutPickerRow: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 8)
                         .background(
-                            selectedId == preset.id ? Theme.accent.opacity(Theme.softFill) : Color.primary.opacity(0.04),
+                            selected ? Theme.accent.opacity(Theme.softFill) : Color.primary.opacity(0.04),
                             in: RoundedRectangle(cornerRadius: Theme.radiusControl, style: .continuous)
                         )
                         .overlay(
                             RoundedRectangle(cornerRadius: Theme.radiusControl)
-                                .stroke(selectedId == preset.id ? Theme.accent.opacity(0.5) : Color.primary.opacity(Theme.hairline), lineWidth: 1)
+                                .stroke(selected ? Theme.accent.opacity(0.5) : Color.primary.opacity(Theme.hairline), lineWidth: 1)
                         )
                 }
                 .buttonStyle(.plain)

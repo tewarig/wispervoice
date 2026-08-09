@@ -28,16 +28,31 @@ final class HistoryStoreTests: XCTestCase {
         XCTAssertTrue(store.items.isEmpty)
     }
 
-    func testAddUsesProviderFromUserDefaults() {
-        UserDefaults.standard.set("Apple Speech (On-device)", forKey: "provider")
+    // add() records the EFFECTIVE engine (ai.stt.* selection, legacy-aware) via the
+    // provider registry's display name — not the raw legacy "provider" string, which goes
+    // stale the moment the engine is switched in the modern picker.
+
+    func testAddResolvesEffectiveProviderFromModernSelection() {
+        UserDefaults.standard.set("openai-whisper", forKey: "ai.stt.provider")
+        defer { UserDefaults.standard.removeObject(forKey: "ai.stt.provider") }
         HistoryStore.shared.add("hello")
-        XCTAssertEqual(HistoryStore.shared.items.first?.provider, "Apple Speech (On-device)")
+        XCTAssertEqual(HistoryStore.shared.items.first?.provider, "Cloud Whisper")
     }
 
-    func testAddUsesEmptyProviderWhenMissing() {
+    func testAddMapsLegacyProviderToDisplayName() {
+        UserDefaults.standard.removeObject(forKey: "ai.stt.provider")
+        UserDefaults.standard.removeObject(forKey: "ai.sttProvider")
+        UserDefaults.standard.set("Apple Speech (On-device)", forKey: "provider")
+        HistoryStore.shared.add("hello")
+        XCTAssertEqual(HistoryStore.shared.items.first?.provider, "Apple Speech")
+    }
+
+    func testAddDefaultsToAppleSpeechWhenNothingSelected() {
+        UserDefaults.standard.removeObject(forKey: "ai.stt.provider")
+        UserDefaults.standard.removeObject(forKey: "ai.sttProvider")
         UserDefaults.standard.removeObject(forKey: "provider")
         HistoryStore.shared.add("hi")
-        XCTAssertEqual(HistoryStore.shared.items.first?.provider, "")
+        XCTAssertEqual(HistoryStore.shared.items.first?.provider, "Apple Speech")
     }
 
     func testLimit100() {

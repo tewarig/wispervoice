@@ -857,8 +857,12 @@ function renderInline(text, keyPrefix) {
   });
 }
 
-// Block markdown for release bodies: ###/## headings, - bullets, ``` fences, paragraphs.
+// Block markdown for release bodies: ###/## headings, -/* bullets, ``` fences, paragraphs.
 // Deliberately tiny instead of a markdown dependency — we render our own notes format.
+// "* " bullets matter: release.yml sets generate_release_notes: true, and GitHub's
+// appended "What's Changed" section uses asterisk bullets, not dashes.
+const isBulletLine = (s) => s.startsWith("- ") || s.startsWith("* ");
+
 function ReleaseBody({ markdown }) {
   const blocks = [];
   const lines = (markdown || "").replace(/\r\n/g, "\n").split("\n");
@@ -894,13 +898,13 @@ function ReleaseBody({ markdown }) {
         </h4>
       );
       i++;
-    } else if (line.startsWith("- ")) {
+    } else if (isBulletLine(line)) {
       const items = [];
-      while (i < lines.length && lines[i].startsWith("- ")) {
+      while (i < lines.length && isBulletLine(lines[i])) {
         // Fold indented continuation lines into the same bullet.
         let item = lines[i].slice(2);
         i++;
-        while (i < lines.length && /^\s{2,}\S/.test(lines[i]) && !lines[i].trim().startsWith("- ")) {
+        while (i < lines.length && /^\s{2,}\S/.test(lines[i]) && !isBulletLine(lines[i].trim())) {
           item += " " + lines[i].trim();
           i++;
         }
@@ -1077,9 +1081,11 @@ function CopyCommandButton({ command }) {
   const [copied, setCopied] = useState(false);
   return (
     <button
-      onClick={() => {
+      onClick={async () => {
+        // await, so a rejected write (denied permission, non-secure context) is caught
+        // and the button never claims "Copied ✓" for text that was not copied.
         try {
-          navigator.clipboard?.writeText(command);
+          await navigator.clipboard.writeText(command);
           setCopied(true);
           setTimeout(() => setCopied(false), 1400);
         } catch {}

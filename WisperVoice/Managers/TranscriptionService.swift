@@ -18,24 +18,31 @@ enum KeychainStore {
     private static let isTestRun = NSClassFromString("XCTestCase") != nil
     private static var testStore: [String: String] = [:]
 
-    static func set(_ value: String, account: String) {
+    /// Returns whether the secret is now stored — callers that are about to destroy the
+    /// only other copy of it (see `migrate`) must check this.
+    @discardableResult
+    static func set(_ value: String, account: String) -> Bool {
         if isTestRun {
             if value.isEmpty { testStore.removeValue(forKey: account) } else { testStore[account] = value }
-            return
+            return true
         }
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account,
         ]
-        guard !value.isEmpty else { SecItemDelete(query as CFDictionary); return }
+        guard !value.isEmpty else {
+            let status = SecItemDelete(query as CFDictionary)
+            return status == errSecSuccess || status == errSecItemNotFound
+        }
         let attributes: [String: Any] = [kSecValueData as String: Data(value.utf8)]
         let status = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
         if status == errSecItemNotFound {
             var add = query
             add[kSecValueData as String] = Data(value.utf8)
-            SecItemAdd(add as CFDictionary, nil)
+            return SecItemAdd(add as CFDictionary, nil) == errSecSuccess
         }
+        return status == errSecSuccess
     }
 
     static func get(_ account: String) -> String? {
@@ -54,12 +61,13 @@ enum KeychainStore {
     }
 
     /// One-time move of a legacy plaintext UserDefaults value into the Keychain.
-    /// The plaintext copy is ALWAYS deleted when found — even when the Keychain already
-    /// holds a key — otherwise the plaintext lingers and defeats the point of the move.
+    /// The plaintext copy is removed only once the secret is provably safe in the Keychain —
+    /// either it was already there, or this write succeeded. Deleting on a failed write
+    /// (locked keychain, denied access) would destroy the user's only copy of the key.
     static func migrate(defaultsKey: String, account: String) {
         guard let legacy = UserDefaults.standard.string(forKey: defaultsKey), !legacy.isEmpty else { return }
-        if get(account) == nil { set(legacy, account: account) }
-        UserDefaults.standard.removeObject(forKey: defaultsKey)
+        let stored = get(account) != nil || set(legacy, account: account)
+        if stored { UserDefaults.standard.removeObject(forKey: defaultsKey) }
     }
 }
 

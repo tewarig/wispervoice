@@ -24,9 +24,12 @@ jobs:
     runs-on: macos-14
     timeout-minutes: 40
     env:
-      # Secrets surfaced as env so step `if:` conditions stay simple and portable.
-      HAS_SIGNING_CERT: ${{ secrets.DEVELOPER_ID_CERTIFICATE_P12 }}
-      HAS_NOTARY_CREDS: ${{ secrets.APPLE_ID }}
+      # Booleans derived from secrets so step `if:` conditions stay simple — never the
+      # secret values themselves (a raw secret in job env is exposed to every step and
+      # third-party action in the job). Notary creds require BOTH the Apple ID and the
+      # app-specific password, or notarytool would submit with an empty password.
+      HAS_SIGNING_CERT: ${{ secrets.DEVELOPER_ID_CERTIFICATE_P12 != '' }}
+      HAS_NOTARY_CREDS: ${{ secrets.APPLE_ID != '' && secrets.APPLE_APP_SPECIFIC_PASSWORD != '' }}
 
     steps:
       - name: Checkout
@@ -100,7 +103,7 @@ jobs:
       # and uncomment the blocks below. See SECURITY.md for details.
 
       - name: Import Developer ID certificate (placeholder)
-        if: ${{ env.HAS_SIGNING_CERT != '' }}
+        if: ${{ env.HAS_SIGNING_CERT == 'true' }}
         env:
           CERT_P12: ${{ secrets.DEVELOPER_ID_CERTIFICATE_P12 }}
           P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
@@ -115,7 +118,7 @@ jobs:
           rm /tmp/certificate.p12
 
       - name: Code sign app (if certificate available)
-        if: ${{ env.HAS_SIGNING_CERT != '' }}
+        if: ${{ env.HAS_SIGNING_CERT == 'true' }}
         run: |
           APP="/tmp/wisper_release_build/Build/Products/Release/WisperVoice.app"
           # Sign with hardened runtime; replace TEAM_ID with your Apple Team ID
@@ -127,7 +130,7 @@ jobs:
           spctl -a -vvv "$APP" || true
 
       - name: Ad-hoc sign (no Developer ID certificate)
-        if: ${{ env.HAS_SIGNING_CERT == '' }}
+        if: ${{ env.HAS_SIGNING_CERT != 'true' }}
         run: |
           APP="/tmp/wisper_release_build/Build/Products/Release/WisperVoice.app"
           # CRITICAL on Apple Silicon: the kernel refuses to execute completely unsigned
@@ -138,7 +141,7 @@ jobs:
           codesign --verify --verbose=2 "$APP"
 
       - name: Notarization placeholder
-        if: ${{ env.HAS_SIGNING_CERT != '' && env.HAS_NOTARY_CREDS != '' }}
+        if: ${{ env.HAS_SIGNING_CERT == 'true' && env.HAS_NOTARY_CREDS == 'true' }}
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
@@ -158,7 +161,7 @@ jobs:
           rm -f "$ZIP_TMP"
 
       - name: Notarization — skipped (no secrets)
-        if: ${{ env.HAS_NOTARY_CREDS == '' }}
+        if: ${{ env.HAS_NOTARY_CREDS != 'true' }}
         run: |
           echo "::notice::Notarization skipped — set APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID secrets to enable."
           echo "To enable notarization, see .github/workflows/release.yml and SECURITY.md."

@@ -114,11 +114,14 @@ final class PermissionsManager: ObservableObject {
         NSWorkspace.shared.open(url)
     }
 
-    /// Speech Recognition is an Apple-Speech-engine dependency, not an app-wide one.
-    /// Whisper.cpp / OpenAI / other engines never touch SFSpeechRecognizer, so the app
-    /// must not nag for (or block "all granted" on) a permission it will not use.
+    /// Cloud Whisper is the ONLY engine that never touches SFSpeechRecognizer — the local
+    /// whisper.cpp / faster-whisper / parakeet providers currently delegate file
+    /// transcription to Apple Speech, so they need the permission too (exempting them
+    /// meant a surprise system prompt mid-transcription while the UI showed all-granted).
+    /// Resolved via the shared legacy-aware accessor so this always agrees with
+    /// DictationManager.usesAppleSpeech.
     static var speechRequired: Bool {
-        (UserDefaults.standard.string(forKey: AISettingsKeys.sttProvider) ?? "apple-speech") == "apple-speech"
+        UserDefaults.standard.sttProviderId != "openai-whisper"
     }
 
     var allGranted: Bool { micGranted && accessibilityGranted && (speechGranted || !Self.speechRequired) }

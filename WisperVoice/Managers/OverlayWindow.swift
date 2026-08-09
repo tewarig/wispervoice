@@ -103,7 +103,18 @@ final class OverlayWindow: NSPanel {
             }
         }
 
-        guard firstPresentation else { return }
+        guard firstPresentation else {
+            // A superseded hide() fade can still be animating toward alpha 0 (its
+            // completion is token-guarded and never runs). Retarget back to opaque so a
+            // dictation started mid-fade never runs with an invisible pill.
+            if alphaValue < 1 {
+                NSAnimationContext.runAnimationGroup { ctx in
+                    ctx.duration = 0
+                    self.animator().alphaValue = 1
+                }
+            }
+            return
+        }
         DispatchQueue.main.async {
             // Retarget any running fade-out back to opaque before ordering in
             NSAnimationContext.runAnimationGroup { ctx in
@@ -212,7 +223,7 @@ struct OverlayView: View {
                         .foregroundStyle(Theme.onGlassSecondary)
                 }
             }
-            .font(.system(size: 12.5, design: .rounded))
+            .font(Theme.transcript)
             .lineLimit(1)
             .truncationMode(.head)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -233,7 +244,9 @@ struct OverlayView: View {
                         Text(didCopy ? "Copied" : "Copy")
                             .font(.system(size: 11.5, weight: .semibold, design: .rounded))
                     }
-                    .foregroundStyle(.white)
+                    // onAccent, not .white: Theme.accent is near-white in dark mode, so a
+                    // white label vanishes the moment the "Copied" state fills the capsule.
+                    .foregroundStyle(didCopy ? Theme.onAccent : .white)
                     .padding(.horizontal, 10).padding(.vertical, 5)
                     .background(didCopy ? Theme.accent : Theme.onGlass.opacity(Theme.subtleFill), in: Capsule())
                     .overlay(Capsule().stroke(Theme.onGlass.opacity(Theme.hairline), lineWidth: 1))
@@ -262,8 +275,8 @@ struct OverlayView: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 7)
         // The capsule grows as content arrives: compact while just recording, wide once
-        // live text streams in (or a result is shown). The window itself stays 480pt;
-        // the capsule animates inside it.
+        // live text streams in (or a result is shown). The window frame follows it —
+        // OverlayWindow.show() sizes the window from OverlayView.width(state:transcriptEmpty:).
         .frame(width: pillWidth, height: 40)
         .background {
             Capsule(style: .continuous)
@@ -277,8 +290,11 @@ struct OverlayView: View {
     }
 
     /// Only Apple Speech produces partials while you talk.
+    /// Resolved via the shared legacy-aware accessor so this always agrees with
+    /// DictationManager.usesAppleSpeech (a hardcoded fallback here diverged for users
+    /// whose selection still lives in the legacy "provider" key).
     private static var livePreviewAvailable: Bool {
-        (UserDefaults.standard.string(forKey: AISettingsKeys.sttProvider) ?? "apple-speech") == "apple-speech"
+        UserDefaults.standard.sttProviderId == "apple-speech"
     }
 
     /// Capsule width for a given state — also drives the WINDOW frame (OverlayWindow.show),

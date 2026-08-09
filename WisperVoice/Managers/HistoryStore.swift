@@ -18,6 +18,11 @@ enum LegacyDefaults {
         let flag = "didMigrateLegacyDefaults"
         let std = UserDefaults.standard
         guard !std.bool(forKey: flag) else { return }
+        // The CURRENT domain's plaintext key must reach the Keychain BEFORE legacy domains
+        // are scanned. Otherwise an older key orphaned in a legacy domain lands in the
+        // Keychain first, and KeychainStore.migrate then discards the newer key while
+        // deleting its plaintext copy — the user silently ends up on a stale key.
+        KeychainStore.migrate(defaultsKey: "openAIKey", account: "openAIKey")
         for domain in legacyDomains {
             guard let keys = CFPreferencesCopyKeyList(domain as CFString, kCFPreferencesCurrentUser, kCFPreferencesAnyHost) as? [String] else { continue }
             for key in keys where !skippedPrefixes.contains(where: key.hasPrefix) {
@@ -65,7 +70,12 @@ final class HistoryStore: ObservableObject {
 
     func add(_ text: String, duration: TimeInterval? = nil) {
         guard !text.isEmpty else { return }
-        let item = HistoryItem(text: text, date: Date(), provider: UserDefaults.standard.string(forKey: "provider") ?? "", duration: duration)
+        // Record the engine actually in use (ai.stt.* selection, legacy-aware), not the
+        // legacy "provider" default — nothing updates that when the engine is switched in
+        // the modern picker, so it froze at "Apple Speech (On-device)" for cloud users.
+        let providerName = AIProviderRegistry.shared.provider(for: UserDefaults.standard.sttProviderId)?.displayName
+            ?? UserDefaults.standard.string(forKey: "provider") ?? ""
+        let item = HistoryItem(text: text, date: Date(), provider: providerName, duration: duration)
         items.insert(item, at: 0)
         if items.count > 100 { items = Array(items.prefix(100)) }
     }

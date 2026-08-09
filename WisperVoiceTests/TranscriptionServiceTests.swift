@@ -98,7 +98,9 @@ final class TranscriptionServiceTests: XCTestCase {
         let json = #"{"choices":[{"message":{"content":" Polished! "}}]}"#.data(using: .utf8)!
         MockURLProtocol.handler = { req in
             XCTAssertEqual(req.httpMethod, "POST")
-            XCTAssertTrue(req.value(forHTTPHeaderField: "Authorization")?.hasPrefix("Bearer ") == true)
+            // Exact match: the key is passed as a direct parameter, so this must be the one
+            // transmitted — a prefix check would miss a stale/wrong key being sent.
+            XCTAssertEqual(req.value(forHTTPHeaderField: "Authorization"), "Bearer sk-123")
             // body contains model gpt-4o-mini
             let body = MockURLProtocol.bodyString(from: req)
             XCTAssertTrue(body.contains("gpt-4o-mini"))
@@ -159,7 +161,7 @@ final class TranscriptionServiceTests: XCTestCase {
         try? Data("fake audio".utf8).write(to: url)
         defer { try? FileManager.default.removeItem(at: url) }
         MockURLProtocol.handler = { req in
-            XCTAssertTrue(req.value(forHTTPHeaderField: "Authorization")?.hasPrefix("Bearer ") == true)
+            XCTAssertEqual(req.value(forHTTPHeaderField: "Authorization"), "Bearer sk-test")
             XCTAssertTrue(req.value(forHTTPHeaderField: "Content-Type")!.contains("multipart"))
             let errData = #"{"error":"bad"}"#.data(using: .utf8)!
             return (HTTPURLResponse(url: req.url!, statusCode: 401, httpVersion: nil, headerFields: nil)!, errData)

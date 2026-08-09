@@ -19,6 +19,12 @@ curl -fsSL -o "$TMP/WisperVoice.zip" "$ZIP_URL"
 echo "→ Installing to /Applications…"
 # ditto preserves the code signature exactly (unzip can subtly break bundles)
 ditto -x -k "$TMP/WisperVoice.zip" "$TMP"
+# Only remove the existing install once the download provably contains the app —
+# otherwise a bad/renamed release asset would delete a working install and then fail.
+if [ ! -d "$TMP/WisperVoice.app" ]; then
+  echo "Download did not contain WisperVoice.app — aborting (existing install untouched)." >&2
+  exit 1
+fi
 rm -rf "$DEST"
 ditto "$TMP/WisperVoice.app" "$DEST"
 # Defensive: harmless if the flag was never set

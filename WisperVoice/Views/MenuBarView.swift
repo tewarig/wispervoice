@@ -288,9 +288,16 @@ struct MenuBarView: View {
     private var isRecording: Bool { dictation.state == .recording }
     private var isTranscribing: Bool { dictation.state == .transcribing }
     private var isInjecting: Bool { dictation.state == .injecting }
+    /// Display name of the engine actually in use (ai.stt.* selection, legacy-aware) —
+    /// `dictation.providerRaw` froze at the legacy value once engines were switched in
+    /// the modern picker, so the popover claimed "Apple Speech" for cloud users.
+    private var engineName: String {
+        AIProviderRegistry.shared.provider(for: UserDefaults.standard.sttProviderId)?.displayName
+            ?? dictation.providerRaw
+    }
     private var statusText: String {
         switch dictation.state {
-        case .idle: return "Ready — \(dictation.providerRaw)"
+        case .idle: return "Ready — \(engineName)"
         case .recording: return "● Recording — press again to stop"
         case .transcribing: return "Transcribing…"
         case .injecting: return "Inserted ✓"

@@ -24,11 +24,10 @@ struct GeneralSettingsPane: View {
     @AppStorage(CloudConfig.sttModelKey) private var cloudSTTModel = "whisper-1"
     @AppStorage(CloudConfig.polishModelKey) private var cloudPolishModel = "gpt-4o-mini"
 
-    /// Read by OverlayWindow.show() each time the pill is presented.
-    private var pillPosition: Binding<String> {
-        Binding(get: { UserDefaults.standard.string(forKey: "pill.position") ?? "bottom-center" },
-                set: { UserDefaults.standard.set($0, forKey: "pill.position") })
-    }
+    /// Read by OverlayWindow.show() each time the pill is presented. @AppStorage (not a
+    /// raw UserDefaults Binding) so picking a new position re-renders the Picker — a plain
+    /// Binding published nothing and the control kept displaying the old value.
+    @AppStorage("pill.position") private var pillPosition = "bottom-center"
 
     /// Engine changes route through selectSTT so the model resets to the new engine's first
     /// ready model instead of pointing at the previous engine's.
@@ -174,22 +173,26 @@ struct GeneralSettingsPane: View {
             .task(id: dictation.openAIKey + "|" + cloudBaseURL) {
                 // Probe the key whenever it or the server settles — the debounce avoids
                 // hitting the API on every keystroke while pasting/typing.
-                guard usesOpenAI, !dictation.openAIKey.isEmpty else { keyCheck = nil; return }
+                guard usesOpenAI, !dictation.openAIKey.isEmpty else {
+                    keyCheck = nil
+                    isCheckingKey = false
+                    return
+                }
                 try? await Task.sleep(nanoseconds: 800_000_000)
                 guard !Task.isCancelled else { return }
                 isCheckingKey = true
                 let verdict = await TranscriptionService.shared.validateOpenAIKey(dictation.openAIKey)
                 // A probe cancelled by further typing throws CancellationError inside the
                 // URLSession call, which reads as .unreachable — don't let the dead task
-                // flash a false "check your connection" over the replacement probe.
-                guard !Task.isCancelled else { return }
+                // flash a false "check your connection" over the replacement probe. Reset
+                // the spinner though, or "Checking key…" sticks until a probe completes.
+                guard !Task.isCancelled else { isCheckingKey = false; return }
                 keyCheck = verdict
                 isCheckingKey = false
             }
-            // Legacy provider binding kept in sync for the older transcription path.
-            Picker("", selection: $dictation.providerRaw) {
-                ForEach(TranscriptionProvider.allCases) { p in Text(p.rawValue).tag(p.rawValue) }
-            }.labelsHidden().pickerStyle(.menu).hidden().frame(height: 0)
+            // (No hidden "legacy sync" Picker here: a hidden picker can never fire its
+            // setter, so it synced nothing. Readers of the legacy "provider" default now
+            // resolve the effective engine via UserDefaults.sttProviderId instead.)
         }
     }
 
@@ -217,10 +220,12 @@ struct GeneralSettingsPane: View {
                 Label("Key verified — ready to transcribe.", systemImage: "checkmark.seal.fill")
                     .font(Theme.rowMeta).foregroundStyle(Theme.violetAccent)
             case .invalid:
-                Label("OpenAI rejected this key — check it and try again.", systemImage: "xmark.octagon.fill")
+                // "The server", not "OpenAI" — the probe hits whatever CloudConfig.baseURL
+                // points at (Groq/Mistral/custom), so naming OpenAI misdirects debugging.
+                Label("The server rejected this key — check it and try again.", systemImage: "xmark.octagon.fill")
                     .font(Theme.rowMeta).foregroundStyle(Theme.alert)
             case .unreachable:
-                Label("Couldn't reach OpenAI to verify — check your connection.", systemImage: "wifi.exclamationmark")
+                Label("Couldn't reach the server to verify — check your connection.", systemImage: "wifi.exclamationmark")
                     .font(Theme.rowMeta).foregroundStyle(.secondary)
             case nil:
                 EmptyView()
@@ -264,7 +269,7 @@ struct GeneralSettingsPane: View {
                     RowDivider()
                     row {
                         SettingRow(title: "Pill position", subtitle: "Where the floating dictation pill appears", systemImage: "rectangle.bottomthird.inset.filled") {
-                            Picker("", selection: pillPosition) {
+                            Picker("", selection: $pillPosition) {
                                 Text("Bottom Center").tag("bottom-center")
                                 Text("Bottom Left").tag("bottom-left")
                                 Text("Bottom Right").tag("bottom-right")
@@ -475,8 +480,10 @@ struct ModelsPane: View {
     }
 
     private var engineSubtitle: String {
+        // In-memory mirror, not KeychainStore.get: this runs on every body evaluation
+        // (tens of times/sec during a model download), and each get is a securityd IPC.
         if modelManager.selectedSTTProviderId == "openai-whisper",
-           (KeychainStore.get("openAIKey") ?? "").isEmpty {
+           DictationManager.shared.openAIKey.isEmpty {
             return "Needs an API key — add it in Settings before this engine can transcribe"
         }
         return modelManager.selectedSTTProviderId == "apple-speech"
